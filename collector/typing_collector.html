@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keystroke &amp; Vocabulary Recorder — Stress Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E7ECF1;
+  --paper-2:#F2F5F8;
+  --grid:#C9D6E2;
+  --grid-strong:#AFC2D2;
+  --ink:#16202B;
+  --ink-soft:#5A6B7B;
+  --ink-faint:#8B9AA8;
+  --pen:#B3123F;
+  --pen-soft:#E4B5C3;
+  --calm:#0F766E;
+  --rule:#16202B;
+  --focus:#B3123F;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:22px 22px;
+  color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  font-size:15px;
+  line-height:1.55;
+  min-height:100vh;
+  padding:28px 20px 80px;
+}
+.sheet{
+  max-width:860px;margin:0 auto;
+  background:var(--paper-2);
+  border:1.5px solid var(--rule);
+  box-shadow:6px 6px 0 rgba(22,32,43,.10);
+}
+
+/* ---- masthead ---- */
+.masthead{border-bottom:1.5px solid var(--rule);padding:18px 26px 14px;display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}
+.masthead h1{
+  font-family:'Space Grotesk',sans-serif;font-weight:700;
+  font-size:clamp(19px,3.4vw,27px);letter-spacing:-.02em;margin:0;line-height:1.1;
+}
+.masthead .sub{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin-top:5px}
+.stamp{font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.5;text-align:right;color:var(--ink-soft);border:1px solid var(--grid-strong);padding:7px 10px;white-space:nowrap}
+.stamp b{color:var(--ink);font-weight:600}
+
+/* ---- field row (lab form) ---- */
+.fields{display:flex;border-bottom:1.5px solid var(--rule);flex-wrap:wrap}
+.field{flex:1 1 140px;padding:9px 14px;border-right:1px solid var(--grid-strong);min-width:0}
+.field:last-child{border-right:none}
+.field .k{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint)}
+.field .v{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
+
+.body{padding:26px}
+.screen{display:none}
+.screen.on{display:block}
+
+h2{font-family:'Space Grotesk',sans-serif;font-size:20px;letter-spacing:-.01em;margin:0 0 10px}
+h3{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft);margin:26px 0 9px;padding-bottom:5px;border-bottom:1px solid var(--grid-strong)}
+p{margin:0 0 12px;max-width:64ch}
+.muted{color:var(--ink-soft);font-size:13.5px}
+ul{margin:0 0 12px;padding-left:20px;max-width:64ch}
+li{margin-bottom:5px}
+
+/* ---- controls ---- */
+label.inline{display:flex;gap:9px;align-items:flex-start;margin:10px 0;cursor:pointer;max-width:64ch}
+input[type=checkbox]{margin-top:3px;width:16px;height:16px;accent-color:var(--pen);flex-shrink:0}
+input[type=text],input[type=number],select{
+  font-family:'IBM Plex Mono',monospace;font-size:14px;padding:8px 10px;
+  border:1.5px solid var(--ink);background:var(--paper-2);color:var(--ink);border-radius:0;width:100%;max-width:250px;
+}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2.5px solid var(--focus);outline-offset:2px}
+.row{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px}
+.row>div{flex:0 1 250px}
+.row .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:5px}
+
+button{
+  font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:15px;
+  padding:11px 22px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper-2);
+  cursor:pointer;border-radius:0;transition:transform .08s ease, box-shadow .08s ease;
+}
+button:hover:not(:disabled){transform:translate(-1px,-1px);box-shadow:3px 3px 0 rgba(22,32,43,.28)}
+button:active:not(:disabled){transform:translate(0,0);box-shadow:none}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--ink)}
+button.pen{background:var(--pen);border-color:var(--pen)}
+.actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:22px;align-items:center}
+
+/* ---- condition banner ---- */
+.banner{border:1.5px solid var(--ink);padding:13px 16px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.banner.calm{border-color:var(--calm);background:rgba(15,118,110,.06)}
+.banner.pressed{border-color:var(--pen);background:rgba(179,18,63,.06)}
+.banner .lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft)}
+.banner .title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;margin-top:1px}
+.clock{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.clock.warn{color:var(--pen)}
+
+/* ---- passage ---- */
+.passage{
+  border-left:3px solid var(--grid-strong);padding:12px 16px;margin-bottom:16px;
+  font-family:'IBM Plex Sans',sans-serif;font-size:15.5px;line-height:1.7;background:rgba(201,214,226,.20);
+}
+.prompt{border-left:3px solid var(--pen);padding:12px 16px;margin-bottom:16px;background:rgba(179,18,63,.05);font-size:15.5px}
+
+textarea{
+  width:100%;min-height:180px;padding:14px;font-family:'IBM Plex Mono',monospace;font-size:14.5px;line-height:1.65;
+  border:1.5px solid var(--ink);background:var(--paper-2);color:var(--ink);resize:vertical;border-radius:0;
+}
+textarea:disabled{opacity:.55}
+
+/* ---- live trace: the signature ---- */
+.trace-wrap{margin-top:16px;border:1.5px solid var(--ink);background:var(--paper-2)}
+.trace-head{display:flex;justify-content:space-between;align-items:center;padding:6px 11px;border-bottom:1px solid var(--grid-strong);font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+canvas{display:block;width:100%;height:96px}
+.readout{display:flex;border-top:1px solid var(--grid-strong);flex-wrap:wrap}
+.cell{flex:1 1 88px;padding:7px 11px;border-right:1px solid var(--grid-strong)}
+.cell:last-child{border-right:none}
+.cell .k{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint)}
+.cell .v{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---- rating scale ---- */
+.scale{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 6px}
+.scale button{flex:1 1 84px;background:transparent;color:var(--ink);padding:14px 8px;font-family:'IBM Plex Mono',monospace;font-size:13px}
+.scale button.sel{background:var(--pen);border-color:var(--pen);color:var(--paper-2)}
+.scale-ends{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em}
+
+/* ---- progress ---- */
+.blocks{display:flex;gap:5px;margin-bottom:20px}
+.blk{flex:1;height:5px;background:var(--grid)}
+.blk.done{background:var(--calm)}
+.blk.now{background:var(--pen)}
+
+table{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:12.5px;margin-bottom:8px}
+th,td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--grid-strong)}
+th{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);font-weight:500}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+.note{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-soft);border-top:1px solid var(--grid-strong);padding-top:12px;margin-top:24px}
+.err{color:var(--pen);font-family:'IBM Plex Mono',monospace;font-size:12.5px;margin-top:9px;min-height:17px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}
+button:hover:not(:disabled){transform:none;box-shadow:none}}
+@media (max-width:560px){body{padding:12px 8px 60px}.body{padding:18px 15px}.masthead{padding:15px 16px 12px}}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="masthead">
+    <div>
+      <h1>Keystroke &amp; Vocabulary Recorder</h1>
+      <div class="sub">Stress Detection Study · Instrument v1.0</div>
+    </div>
+    <div class="stamp">
+      SHEET <b id="stampId">—</b><br>
+      OPENED <b id="stampDate">—</b>
+    </div>
+  </div>
+
+  <div class="fields">
+    <div class="field"><div class="k">Participant</div><div class="v" id="fParticipant">—</div></div>
+    <div class="field"><div class="k">Block</div><div class="v" id="fBlock">0 / 4</div></div>
+    <div class="field"><div class="k">Condition</div><div class="v" id="fCondition">—</div></div>
+    <div class="field"><div class="k">Events logged</div><div class="v" id="fEvents">0</div></div>
+  </div>
+
+  <div class="body">
+
+  <!-- ================= CONSENT ================= -->
+  <section class="screen on" id="s-consent">
+    <h2>Before you begin</h2>
+    <p>This is a student research project at UPES, Dehradun. We are studying whether the way a person types can indicate their stress level.</p>
+
+    <h3>What gets recorded</h3>
+    <ul>
+      <li>The timing of each key you press and release, in milliseconds.</li>
+      <li>The text you type during the tasks on this page.</li>
+      <li>Your own rating of how stressed you feel after each task.</li>
+    </ul>
+
+    <h3>What does not get recorded</h3>
+    <ul>
+      <li>Nothing outside this page. This tool cannot see other tabs, applications, or anything you type elsewhere.</li>
+      <li>No name, email, or contact details. You are identified only by a code.</li>
+      <li>Nothing is uploaded. Data stays in this browser until you download it and hand it to the research team.</li>
+    </ul>
+
+    <p class="muted">Takes about 15 minutes. You can stop at any point by closing the tab, and nothing will be kept.</p>
+
+    <label class="inline">
+      <input type="checkbox" id="consent">
+      <span>I have read the above and agree to take part. I understand my keystroke timings and the text I type here will be recorded for this study.</span>
+    </label>
+
+    <div class="row" style="margin-top:16px">
+      <div>
+        <span class="k">Participant code</span>
+        <input type="text" id="pid" placeholder="e.g. P07" maxlength="12" autocomplete="off">
+      </div>
+      <div>
+        <span class="k">Age band</span>
+        <select id="age">
+          <option value="">Prefer not to say</option>
+          <option>18–21</option><option>22–25</option><option>26–30</option><option>31+</option>
+        </select>
+      </div>
+      <div>
+        <span class="k">Typing familiarity</span>
+        <select id="skill">
+          <option value="">Prefer not to say</option>
+          <option>Beginner</option><option>Comfortable</option><option>Touch typist</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="err" id="consentErr"></div>
+    <div class="actions"><button id="btnStart">Start session</button></div>
+  </section>
+
+  <!-- ================= BRIEF ================= -->
+  <section class="screen" id="s-brief">
+    <h2 id="briefTitle">Block 1 of 4</h2>
+    <div class="blocks" id="briefBlocks"></div>
+    <div class="banner" id="briefBanner">
+      <div><div class="lbl">Condition</div><div class="title" id="briefCond">—</div></div>
+      <div><div class="lbl">Task</div><div class="title" id="briefTask">—</div></div>
+    </div>
+    <p id="briefText"></p>
+    <p class="muted" id="briefHint"></p>
+    <div class="actions"><button id="btnBegin">Begin task</button></div>
+  </section>
+
+  <!-- ================= TASK ================= -->
+  <section class="screen" id="s-task">
+    <div class="banner" id="taskBanner">
+      <div><div class="lbl">Condition</div><div class="title" id="taskCond">—</div></div>
+      <div class="clock" id="clock">00:00</div>
+    </div>
+
+    <div id="passageBox" class="passage"></div>
+    <div id="promptBox" class="prompt"></div>
+
+    <textarea id="entry" spellcheck="false" autocomplete="off" autocapitalize="off"
+      placeholder="Start typing here…"></textarea>
+
+    <div class="trace-wrap">
+      <div class="trace-head"><span>Inter-key interval trace</span><span id="traceScale">0–600 ms</span></div>
+      <canvas id="trace" width="1600" height="192" aria-label="Live trace of the time between your keystrokes"></canvas>
+      <div class="readout">
+        <div class="cell"><div class="k">Keys</div><div class="v" id="mKeys">0</div></div>
+        <div class="cell"><div class="k">Speed cpm</div><div class="v" id="mSpeed">0</div></div>
+        <div class="cell"><div class="k">Corrections</div><div class="v" id="mBack">0</div></div>
+        <div class="cell"><div class="k">Pauses &gt;2s</div><div class="v" id="mPause">0</div></div>
+        <div class="cell"><div class="k">Median IKI</div><div class="v" id="mIki">—</div></div>
+      </div>
+    </div>
+
+    <div class="err" id="taskErr"></div>
+    <div class="actions"><button id="btnDone">Finish task</button>
+      <span class="muted" id="taskFloor"></span></div>
+  </section>
+
+  <!-- ================= RATING ================= -->
+  <section class="screen" id="s-rate">
+    <h2>How did that feel?</h2>
+    <p class="muted">Answer for how you felt <em>during the task you just did</em>, not in general.</p>
+
+    <h3>Stress level</h3>
+    <div class="scale" id="scaleStress">
+      <button data-v="Low">Low</button>
+      <button data-v="Medium">Medium</button>
+      <button data-v="High">High</button>
+    </div>
+
+    <h3>Intensity</h3>
+    <div class="scale" id="scaleIntensity">
+      <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button>
+      <button data-v="4">4</button><button data-v="5">5</button>
+    </div>
+    <div class="scale-ends"><span>Completely relaxed</span><span>Extremely stressed</span></div>
+
+    <h3>Time pressure felt</h3>
+    <div class="scale" id="scalePressure">
+      <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button>
+      <button data-v="4">4</button><button data-v="5">5</button>
+    </div>
+    <div class="scale-ends"><span>None at all</span><span>Very high</span></div>
+
+    <div class="err" id="rateErr"></div>
+    <div class="actions"><button id="btnNext">Continue</button></div>
+  </section>
+
+  <!-- ================= DONE ================= -->
+  <section class="screen" id="s-done">
+    <h2>Session complete</h2>
+    <p>Thank you. Download both files and send them to the research team.</p>
+
+    <h3>Recorded</h3>
+    <table id="summary"></table>
+
+    <div class="actions">
+      <button class="pen" id="btnCsvSessions">Download sessions.csv</button>
+      <button class="pen" id="btnCsvKeys">Download keystrokes.csv</button>
+      <button class="ghost" id="btnJson">Download raw JSON</button>
+    </div>
+
+    <div class="actions">
+      <button class="ghost" id="btnAnother">Record another participant</button>
+    </div>
+
+    <div class="note">
+      sessions.csv holds one row per task with the typed text and your ratings.
+      keystrokes.csv holds one row per key event with millisecond timings.
+      They join on <b>session_id</b>.
+    </div>
+  </section>
+
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------
+   Block design: relaxed first, then pressured, so the pressure
+   condition cannot contaminate the relaxed baseline.
+   Each condition has a COPY task (clean keystroke dynamics, controlled
+   text) and a FREE task (real vocabulary + sentiment signal).
+-------------------------------------------------------------------*/
+const PASSAGE_A = "The library on the north side of campus stays open until midnight during term time. Most students sit near the windows because the light is better there and the tables are wider. A small noticeboard by the entrance lists the opening hours for each day of the week.";
+const PASSAGE_B = "Quarterly throughput increased by 34% while the average handling time fell from 12.6 minutes to 9.8 minutes; however, the variance across the three regional teams widened considerably, and the committee requested a breakdown by shift, weekday, and escalation category before approving the revised staffing model.";
+
+const BLOCKS = [
+  { cond:"relaxed",   task:"copy", limit:0,   title:"Relaxed · Copy a passage",
+    text:"Type the passage below at whatever pace feels natural. There is no timer and no score. Accuracy does not matter.",
+    hint:"Take as long as you like." },
+  { cond:"relaxed",   task:"free", limit:0,   title:"Relaxed · Write freely",
+    text:"Write a few sentences about how your week has been going and what has been on your mind lately.",
+    hint:"Aim for 40 words or more. There is no time limit." },
+  { cond:"pressured", task:"copy", limit:90,  title:"Pressured · Copy under time",
+    text:"Type the passage below as quickly and accurately as you can. You have 90 seconds. The passage is deliberately difficult.",
+    hint:"The timer starts on your first keystroke." },
+  { cond:"pressured", task:"free", limit:75,  title:"Pressured · Write under time",
+    text:"In 75 seconds, write about something currently worrying you or a deadline you are facing.",
+    hint:"Write as much as you can before the timer runs out." }
+];
+
+const MIN_CHARS = 60;
+const PAUSE_MS  = 2000;
+
+const state = {
+  participant:{ id:"", age:"", skill:"", consentAt:"" },
+  sheetId: "S" + Math.random().toString(36).slice(2,7).toUpperCase(),
+  blockIndex: 0,
+  sessions: [],
+  current: null,
+  rating: { stress:null, intensity:null, pressure:null }
+};
+
+/* ---------- tiny helpers ---------- */
+const $ = id => document.getElementById(id);
+const show = id => { document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on")); $(id).classList.add("on"); window.scrollTo({top:0,behavior:"instant"}); };
+const pad2 = n => String(n).padStart(2,"0");
+const nowIso = () => new Date().toISOString();
+
+function median(a){ if(!a.length) return null; const s=[...a].sort((x,y)=>x-y); const m=s.length>>1;
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
+
+/* ---------- stamps ---------- */
+$("stampId").textContent = state.sheetId;
+$("stampDate").textContent = new Date().toISOString().slice(0,10);
+
+/* ================= CONSENT ================= */
+$("btnStart").addEventListener("click", () => {
+  const id = $("pid").value.trim();
+  if(!$("consent").checked){ $("consentErr").textContent = "Tick the consent box to continue."; return; }
+  if(!id){ $("consentErr").textContent = "Enter a participant code so the files can be matched up."; return; }
+  $("consentErr").textContent = "";
+  state.participant = { id, age:$("age").value, skill:$("skill").value, consentAt: nowIso() };
+  $("fParticipant").textContent = id;
+  state.blockIndex = 0;
+  openBrief();
+});
+
+/* ================= BRIEF ================= */
+function renderBlocks(el){
+  el.innerHTML = "";
+  BLOCKS.forEach((_,i)=>{
+    const d=document.createElement("div");
+    d.className = "blk" + (i<state.blockIndex ? " done" : i===state.blockIndex ? " now" : "");
+    el.appendChild(d);
+  });
+}
+
+function openBrief(){
+  const b = BLOCKS[state.blockIndex];
+  $("briefTitle").textContent = `Block ${state.blockIndex+1} of ${BLOCKS.length}`;
+  $("briefCond").textContent  = b.cond === "relaxed" ? "Relaxed" : "Time pressure";
+  $("briefTask").textContent  = b.task === "copy" ? "Copy passage" : "Free writing";
+  $("briefText").textContent  = b.text;
+  $("briefHint").textContent  = b.hint;
+  $("briefBanner").className  = "banner " + (b.cond==="relaxed" ? "calm" : "pressed");
+  renderBlocks($("briefBlocks"));
+  $("fBlock").textContent = `${state.blockIndex+1} / ${BLOCKS.length}`;
+  $("fCondition").textContent = b.cond === "relaxed" ? "Relaxed" : "Pressured";
+  show("s-brief");
+}
+$("btnBegin").addEventListener("click", startTask);
+
+/* ================= TASK ================= */
+let timerHandle = null, tickHandle = null, started = false;
+
+function startTask(){
+  const b = BLOCKS[state.blockIndex];
+  state.current = {
+    session_id: `${state.participant.id}_B${state.blockIndex+1}`,
+    block: state.blockIndex+1,
+    condition: b.cond,
+    task_type: b.task,
+    time_limit_s: b.limit,
+    target_text: b.task==="copy" ? (b.cond==="relaxed"?PASSAGE_A:PASSAGE_B) : "",
+    prompt: b.task==="free" ? b.text : "",
+    started_at: nowIso(),
+    t0: performance.now(),
+    events: [],
+    downAt: new Map(),
+    ikis: [],
+    lastDown: null,
+    backspaces: 0,
+    pauses: 0
+  };
+  started = false;
+
+  $("taskCond").textContent = b.cond==="relaxed" ? "Relaxed" : "Time pressure";
+  $("taskBanner").className = "banner " + (b.cond==="relaxed" ? "calm" : "pressed");
+  $("taskErr").textContent = "";
+  $("taskFloor").textContent = b.task==="free" ? `Minimum ${MIN_CHARS} characters.` : "";
+
+  if(b.task==="copy"){ $("passageBox").style.display="block"; $("passageBox").textContent = state.current.target_text; $("promptBox").style.display="none"; }
+  else { $("passageBox").style.display="none"; $("promptBox").style.display="block"; $("promptBox").textContent = b.text; }
+
+  const ta = $("entry");
+  ta.value = ""; ta.disabled = false;
+  $("clock").textContent = b.limit ? `${pad2(Math.floor(b.limit/60))}:${pad2(b.limit%60)}` : "00:00";
+  $("clock").classList.remove("warn");
+  resetTrace(); updateMetrics();
+  show("s-task");
+  setTimeout(()=>ta.focus(), 60);
+}
+
+const entry = $("entry");
+entry.addEventListener("paste", e => { e.preventDefault(); $("taskErr").textContent = "Pasting is disabled — the study needs your live typing."; });
+entry.addEventListener("drop",  e => e.preventDefault());
+
+entry.addEventListener("keydown", e => {
+  const c = state.current; if(!c) return;
+  const t = performance.now() - c.t0;
+
+  if(!started){ started = true; beginClock(); }
+
+  if(!c.downAt.has(e.code)) c.downAt.set(e.code, t);
+
+  if(c.lastDown !== null){
+    const iki = t - c.lastDown;
+    if(iki >= 0 && iki < 60000){
+      c.ikis.push(iki);
+      if(iki > PAUSE_MS) c.pauses++;
+      pushTrace(iki);
+    }
+  }
+  c.lastDown = t;
+  if(e.key === "Backspace" || e.key === "Delete") c.backspaces++;
+
+  c.events.push({ ev:"down", key:e.key, code:e.code, t:+t.toFixed(2),
+                  shift:e.shiftKey?1:0, ctrl:e.ctrlKey?1:0, alt:e.altKey?1:0 });
+  updateMetrics();
+});
+
+entry.addEventListener("keyup", e => {
+  const c = state.current; if(!c) return;
+  const t = performance.now() - c.t0;
+  let dwell = null;
+  if(c.downAt.has(e.code)){ dwell = t - c.downAt.get(e.code); c.downAt.delete(e.code); }
+  c.events.push({ ev:"up", key:e.key, code:e.code, t:+t.toFixed(2),
+                  dwell: dwell===null?"":+dwell.toFixed(2), shift:0, ctrl:0, alt:0 });
+});
+
+/* ---------- clock ---------- */
+function beginClock(){
+  const b = BLOCKS[state.blockIndex];
+  const t0 = performance.now();
+  clearInterval(tickHandle);
+  tickHandle = setInterval(()=>{
+    const el = (performance.now()-t0)/1000;
+    if(b.limit){
+      const left = Math.max(0, b.limit - el);
+      $("clock").textContent = `${pad2(Math.floor(left/60))}:${pad2(Math.floor(left%60))}`;
+      $("clock").classList.toggle("warn", left <= 15);
+      if(left <= 0){ clearInterval(tickHandle); finishTask(true); }
+    } else {
+      $("clock").textContent = `${pad2(Math.floor(el/60))}:${pad2(Math.floor(el%60))}`;
+    }
+    updateMetrics();
+  }, 200);
+}
+
+/* ---------- live metrics ---------- */
+function updateMetrics(){
+  const c = state.current; if(!c) return;
+  const chars = entry.value.length;
+  const mins = Math.max((performance.now()-c.t0)/60000, 1e-6);
+  $("mKeys").textContent  = c.events.filter(e=>e.ev==="down").length;
+  $("mSpeed").textContent = started ? Math.round(chars/mins) : 0;
+  $("mBack").textContent  = c.backspaces;
+  $("mPause").textContent = c.pauses;
+  const m = median(c.ikis);
+  $("mIki").textContent   = m===null ? "—" : Math.round(m);
+  $("fEvents").textContent = totalEvents() + c.events.length;
+}
+const totalEvents = () => state.sessions.reduce((n,s)=>n+s.events.length,0);
+
+/* ---------- the trace: a chart-recorder pen for inter-key intervals ---------- */
+const cv = $("trace"), cx = cv.getContext("2d");
+let traceData = [];
+const TRACE_MAX = 160, TRACE_CEIL = 600;
+
+function resetTrace(){ traceData = []; drawTrace(); }
+function pushTrace(v){ traceData.push(v); if(traceData.length>TRACE_MAX) traceData.shift(); drawTrace(); }
+
+function drawTrace(){
+  const W = cv.width, H = cv.height;
+  const css = getComputedStyle(document.documentElement);
+  const grid = css.getPropertyValue("--grid").trim() || "#C9D6E2";
+  const pen  = css.getPropertyValue("--pen").trim()  || "#B3123F";
+  const soft = css.getPropertyValue("--ink-faint").trim() || "#8B9AA8";
+
+  cx.clearRect(0,0,W,H);
+
+  // graph-paper ruling
+  cx.strokeStyle = grid; cx.lineWidth = 1;
+  for(let i=1;i<4;i++){ const y=(H/4)*i; cx.beginPath(); cx.moveTo(0,y); cx.lineTo(W,y); cx.stroke(); }
+
+  // pause threshold line
+  const yPause = H - (Math.min(PAUSE_MS,TRACE_CEIL)/TRACE_CEIL)*H;
+  cx.strokeStyle = soft; cx.setLineDash([5,5]);
+  cx.beginPath(); cx.moveTo(0,yPause); cx.lineTo(W,yPause); cx.stroke(); cx.setLineDash([]);
+
+  if(!traceData.length) return;
+
+  const step = W / TRACE_MAX;
+  cx.strokeStyle = pen; cx.lineWidth = 2.2; cx.lineJoin="round";
+  cx.beginPath();
+  traceData.forEach((v,i)=>{
+    const x = i*step;
+    const y = H - (Math.min(v,TRACE_CEIL)/TRACE_CEIL)*H;
+    i ? cx.lineTo(x,y) : cx.moveTo(x,y);
+  });
+  cx.stroke();
+
+  // mark pauses that clipped the ceiling
+  cx.fillStyle = pen;
+  traceData.forEach((v,i)=>{ if(v>TRACE_CEIL){ cx.fillRect(i*step-1.5, 0, 3, 7); } });
+}
+window.addEventListener("resize", drawTrace);
+
+/* ---------- finish ---------- */
+$("btnDone").addEventListener("click", ()=>finishTask(false));
+
+function finishTask(auto){
+  const c = state.current; if(!c) return;
+  const b = BLOCKS[state.blockIndex];
+  const text = entry.value;
+
+  if(!auto && text.trim().length < MIN_CHARS){
+    $("taskErr").textContent = `Type at least ${MIN_CHARS} characters before finishing (currently ${text.trim().length}).`;
+    return;
+  }
+  clearInterval(tickHandle);
+  entry.disabled = true;
+
+  const durMs = performance.now() - c.t0;
+  const downs = c.events.filter(e=>e.ev==="down").length;
+  const dwells = c.events.filter(e=>e.ev==="up" && e.dwell!=="" && e.dwell<2000).map(e=>e.dwell);
+
+  c.typed_text   = text;
+  c.ended_at     = nowIso();
+  c.duration_s   = +(durMs/1000).toFixed(2);
+  c.char_count   = text.length;
+  c.word_count   = text.trim() ? text.trim().split(/\s+/).length : 0;
+  c.keystrokes   = downs;
+  c.typing_speed_cpm = +(text.length/(durMs/60000)).toFixed(2);
+  c.backspace_rate   = downs ? +(c.backspaces/downs).toFixed(4) : 0;
+  c.long_pause_rate  = c.ikis.length ? +(c.pauses/c.ikis.length).toFixed(4) : 0;
+  c.median_iki_ms    = median(c.ikis) === null ? "" : +median(c.ikis).toFixed(2);
+  c.mean_iki_ms      = c.ikis.length ? +(c.ikis.reduce((a,b)=>a+b,0)/c.ikis.length).toFixed(2) : "";
+  c.mean_dwell_ms    = dwells.length ? +(dwells.reduce((a,b)=>a+b,0)/dwells.length).toFixed(2) : "";
+  c.timed_out        = auto ? 1 : 0;
+  delete c.downAt;
+
+  state.rating = { stress:null, intensity:null, pressure:null };
+  document.querySelectorAll(".scale button").forEach(b=>b.classList.remove("sel"));
+  $("rateErr").textContent = "";
+  show("s-rate");
+}
+
+/* ================= RATING ================= */
+function wireScale(elId, key){
+  $(elId).addEventListener("click", e => {
+    const btn = e.target.closest("button"); if(!btn) return;
+    $(elId).querySelectorAll("button").forEach(b=>b.classList.remove("sel"));
+    btn.classList.add("sel");
+    state.rating[key] = btn.dataset.v;
+  });
+}
+wireScale("scaleStress","stress");
+wireScale("scaleIntensity","intensity");
+wireScale("scalePressure","pressure");
+
+$("btnNext").addEventListener("click", () => {
+  const r = state.rating;
+  if(!r.stress || !r.intensity || !r.pressure){ $("rateErr").textContent = "Answer all three before continuing."; return; }
+  const c = state.current;
+  c.self_report_stress = r.stress;
+  c.self_report_intensity = +r.intensity;
+  c.self_report_pressure = +r.pressure;
+  state.sessions.push(c);
+  state.current = null;
+  persist();
+
+  state.blockIndex++;
+  if(state.blockIndex < BLOCKS.length) openBrief();
+  else finishSession();
+});
+
+/* ================= DONE ================= */
+function finishSession(){
+  const t = $("summary");
+  t.innerHTML = "<tr><th>Block</th><th>Condition</th><th>Task</th><th class='num'>Words</th><th class='num'>Keys</th><th class='num'>cpm</th><th>Stress</th></tr>";
+  state.sessions.forEach(s=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${s.block}</td><td>${s.condition}</td><td>${s.task_type}</td>
+      <td class="num">${s.word_count}</td><td class="num">${s.keystrokes}</td>
+      <td class="num">${Math.round(s.typing_speed_cpm)}</td><td>${s.self_report_stress}</td>`;
+    t.appendChild(tr);
+  });
+  $("fCondition").textContent = "complete";
+  show("s-done");
+}
+
+/* ---------- CSV export ---------- */
+const SESSION_COLS = ["participant_id","age_band","typing_familiarity","session_id","block","condition",
+  "task_type","time_limit_s","timed_out","started_at","ended_at","duration_s","char_count","word_count",
+  "keystrokes","typing_speed_cpm","backspace_count","backspace_rate","long_pause_count","long_pause_rate",
+  "median_iki_ms","mean_iki_ms","mean_dwell_ms","self_report_stress","self_report_intensity",
+  "self_report_pressure","typed_text"];
+
+function esc(v){
+  const s = v===null||v===undefined ? "" : String(v);
+  return /[",\n\r]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+
+function sessionsCsv(){
+  const p = state.participant;
+  const rows = [SESSION_COLS.join(",")];
+  state.sessions.forEach(s=>{
+    rows.push([p.id,p.age,p.skill,s.session_id,s.block,s.condition,s.task_type,s.time_limit_s,s.timed_out,
+      s.started_at,s.ended_at,s.duration_s,s.char_count,s.word_count,s.keystrokes,s.typing_speed_cpm,
+      s.backspaces,s.backspace_rate,s.pauses,s.long_pause_rate,s.median_iki_ms,s.mean_iki_ms,s.mean_dwell_ms,
+      s.self_report_stress,s.self_report_intensity,s.self_report_pressure,s.typed_text].map(esc).join(","));
+  });
+  return rows.join("\n");
+}
+
+function keystrokesCsv(){
+  const p = state.participant;
+  const rows = ["participant_id,session_id,condition,task_type,event,key,code,t_ms,dwell_ms,shift,ctrl,alt,stress_label"];
+  state.sessions.forEach(s=>{
+    s.events.forEach(e=>{
+      rows.push([p.id,s.session_id,s.condition,s.task_type,e.ev,e.key,e.code,e.t,
+        e.dwell===undefined?"":e.dwell,e.shift,e.ctrl,e.alt,s.self_report_stress].map(esc).join(","));
+    });
+  });
+  return rows.join("\n");
+}
+
+function download(name, text, mime){
+  const blob = new Blob([text], {type: mime || "text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+
+const tag = () => `${state.participant.id}_${state.sheetId}`;
+$("btnCsvSessions").addEventListener("click", ()=>download(`sessions_${tag()}.csv`, sessionsCsv()));
+$("btnCsvKeys").addEventListener("click", ()=>download(`keystrokes_${tag()}.csv`, keystrokesCsv()));
+$("btnJson").addEventListener("click", ()=>download(`raw_${tag()}.json`,
+  JSON.stringify({participant:state.participant, sheet:state.sheetId, sessions:state.sessions}, null, 2),
+  "application/json"));
+
+$("btnAnother").addEventListener("click", ()=>{
+  if(!confirm("Start a new participant? Download the files first — this clears the current session.")) return;
+  state.sessions = []; state.blockIndex = 0; state.current = null;
+  state.sheetId = "S" + Math.random().toString(36).slice(2,7).toUpperCase();
+  $("stampId").textContent = state.sheetId;
+  $("pid").value = ""; $("consent").checked = false;
+  $("fParticipant").textContent = "—"; $("fBlock").textContent = "0 / 4";
+  $("fCondition").textContent = "—"; $("fEvents").textContent = "0";
+  show("s-consent");
+});
+
+/* ---------- crash resilience (best effort, never blocks the app) ---------- */
+function persist(){
+  try{
+    localStorage.setItem("stress_recorder_backup", JSON.stringify({
+      participant: state.participant, sheet: state.sheetId,
+      sessions: state.sessions.map(s=>({...s, events: s.events.length}))
+    }));
+  }catch(_){ /* private mode or file:// — data still lives in memory */ }
+}
+
+window.addEventListener("beforeunload", e => {
+  if(state.sessions.length && $("s-done").classList.contains("on") === false){
+    e.preventDefault(); e.returnValue = "";
+  }
+});
+
+drawTrace();
+</script>
+</body>
+</html>

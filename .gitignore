@@ -1,0 +1,16 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+
+# Datasets are local inputs. They may be large or have redistribution limits.
+data/*
+!data/.gitkeep
+!data/README.md
+!data/own/
+data/own/*
+!data/own/.gitkeep
+
+# Generated results and model binaries are recreated by the runner scripts.
+outputs/*
+!outputs/.gitkeep
