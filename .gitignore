@@ -11,6 +11,12 @@ data/*
 data/own/*
 !data/own/.gitkeep
 
+# Papers downloaded through the university's IEEE Xplore licence. Cite and link them.
+docs/**/*.pdf
+
 # Generated results and model binaries are recreated by the runner scripts.
 outputs/*
 !outputs/.gitkeep
+
+# Packaged copies for sharing
+dist/

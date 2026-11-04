@@ -1,0 +1,5 @@
+# Optional: only for run_transformer.py (DistilBERT comparison).
+# Large download (PyTorch ~ several hundred MB, model weights ~260 MB).
+-r requirements.txt
+torch>=2.2
+transformers>=4.40

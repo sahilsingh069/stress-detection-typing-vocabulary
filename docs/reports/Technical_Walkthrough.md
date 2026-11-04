@@ -117,9 +117,10 @@ F1 = their harmonic mean.
 class equal weight regardless of size.
 
 **The concrete example from our current results:** the best typing configuration
-reaches 0.524 macro F1 but only 0.548 accuracy, below the 0.639 majority-class
-baseline. This confirms that interaction features help, but the two-participant
-dataset still does not support a useful general stress model.
+(keystroke + interaction, 3-class, Random Forest) reaches 0.553 macro F1 but
+only 0.629 accuracy, still below the 0.639 majority-class baseline. This
+confirms that interaction features help, but the two-participant dataset still
+does not support a useful general stress model.
 
 ### Majority-class baseline
 The accuracy you would get by always predicting the most common class. For our
@@ -132,6 +133,26 @@ Split the data into k parts, train on k−1 and test on the remaining one, rotat
 average. Gives a more trustworthy estimate than one split because it does not
 depend on which samples happened to land in the test set. We use stratified
 k-fold, which preserves the class distribution in every fold.
+
+### Grouped cross-validation (whole participants held out)
+When every person contributes many samples, an ordinary random split puts the
+same person in both training and test data. The model can then score well by
+recognising *people* (their speed, their habits) instead of *stress*. Our
+Kaggle cross-user test showed exactly this.
+
+So every dataset that identifies participants (SWELL-KW, our own sessions) is
+evaluated with `StratifiedGroupKFold`: each fold holds out whole participants,
+and every prediction comes from a model that never saw that person. This is the
+number that predicts how the system does on a *new* user. `run_swell.py` also
+reports the random-split score next to it, purely to show how much person
+leakage would have inflated the result.
+
+### Per-participant calibration
+Typing is very personal: a slow typist under stress may still be slower than a
+fast typist at rest. *Calibration* z-scores each person's features against
+their own average. It uses the test person's typing but **never their labels**
+— it models a system that watches a new user for a while before judging them.
+We report it separately from the uncalibrated number, never mixed.
 
 ---
 
@@ -169,11 +190,21 @@ Train one model per modality independently, then combine their predicted
 probabilities. Advantage: each model can be trained on whichever dataset suits
 it. Works with **unpaired** data.
 
-### Why we currently use late fusion
-Dreaddit and the keystroke dataset come from different people. There is no row
-anywhere in our data that has both a person's typing measurements and their
-text. Early fusion is therefore mathematically impossible with what we have —
-not difficult, impossible.
+### Stacking
+A third option: train both single-modality models, then train a small
+meta-classifier (logistic regression) that takes both models' probability
+outputs as its input. It learns *when* to trust which modality. It also needs
+paired data. To keep it honest, the meta-classifier is trained only on
+out-of-fold probabilities and is itself scored out-of-fold.
+
+### Which fusion works on which data
+Dreaddit and the keystroke datasets come from different people. There is no row
+in the public data that has both a person's typing measurements and their text,
+so on public data early fusion and stacking are impossible — not difficult,
+impossible — and only the late-fusion *mechanism* can be demonstrated
+(`run_fusion.py`). On our own collected sessions all of them are valid, and
+`run_paired.py` compares typing only, text only, early fusion, two late-fusion
+rules and stacking side by side, with participants held out.
 
 ### The probability alignment problem
 Dreaddit is binary (stress / no stress). Our typing data is 3-class (Low /
@@ -190,7 +221,62 @@ contribution, not a convenience.
 
 ---
 
+## Part 5b — The data collection design
+
+The collector (`collector/typing_collector.html`, v2) runs four blocks: relaxed
+copy task, relaxed chat (4 questions), timed copy task, timed chat (30 s per
+answer). The participant rates their stress after each block.
+
+**Why a chat instead of one free-writing box:** each answer becomes its own
+sample, so one participant yields 8 text samples instead of 2, and short
+conversational answers are closer to how people actually type day to day.
+
+**Why the same questions in both conditions:** the 8 everyday questions come
+from one neutral pool, shuffled per participant; 4 land in the relaxed block
+and 4 in the timed block. If the timed block asked about worries and the
+relaxed block about the weekend, any vocabulary difference could come from the
+*topic* rather than from stress. The same applies to the two copy passages,
+which are matched in length and structure and randomly assigned.
+
+**Why some columns are never given to the models:** the session file also
+records the condition, the block number, the time limit, the duration, raw key
+and word counts and the self-ratings. These are either the label itself or are
+fixed by the timer (a timed answer is short *because of the timer*). The models
+only see an explicit allow-list of typing features (`config.OWN_TYPING_FEATURES`)
+and the text, with `word_count` removed.
+
+**Manipulation check:** `run_paired.py` reports self-rated stress and time
+pressure per condition. If the timed blocks do not feel more stressful, the
+experiment failed to induce stress and that must be said.
+
 ## Part 6 — Questions you should expect, and honest answers
+
+**"Why do you hold out whole participants?"**
+Because a deployed system meets people it has never seen. With a random split
+the same person appears in training and test data, and the model can learn to
+recognise the person rather than their stress. Our Kaggle cross-user test
+(macro F1 about 0.40) shows how big that effect is.
+
+**"How does a real user get feedback? You only trained and tested."**
+Training happens once; the trained models are saved to files. The local
+server loads them and runs them on new input in a fraction of a second. The
+Chrome extension captures a burst of typing in any web text field, sends it to
+that server after a 2-second pause, and shows the result on the toolbar badge.
+The demo page does the same inside one page.
+
+**"Isn't the extension a keylogger?"**
+No: it reads only text fields (never password, email, card or one-time-code
+fields), sends only to the user's own computer, can be paused per site or
+switched off, and stores only the estimates, never the text. A system-wide
+logger would be one; we rejected that (Decision Log D20).
+
+**"Why did your mid-term typing numbers change?"**
+We found that dwell time on the Kaggle data was being paired by key name, but
+the dataset masks almost every key as `$`, so overlapping keystrokes were
+mismatched. The files store each keystroke's press and release on one row, so
+we now pair them exactly. The best 3-class macro F1 rose from 0.497 to 0.553;
+every configuration is still below the baseline, so the conclusion is
+unchanged. It is recorded in the Decision Log (D11).
 
 **"Why is your typing accuracy below the baseline?"**
 Two participants and roughly 100 labels. We tested it directly: training on one
@@ -205,10 +291,18 @@ other, which indicates a feature or data ceiling rather than a hyperparameter
 ceiling. On the typing pipeline, the cross-user test shows the problem is the
 number of participants.
 
-**"Why two datasets instead of one?"**
-No public dataset contains both keystroke dynamics and typed text labelled for
-stress. Dreaddit provides text, SWELL-KW provides interaction behaviour, and
-neither provides the other. Our own collection is intended to close that gap.
+**"Why several datasets instead of one?"**
+We found none released with both modalities labelled for stress. Dreaddit gives text
+with self-disclosure; SWELL-KW gives interaction logs, and its raw logs let us rebuild
+typing and text together. Each covers what another lacks.
+
+**"Does fusion work?"**
+On real paired data from SWELL-KW it showed no measurable gain: every 95% interval for the
+difference includes zero. The sample is small, so we say "not shown", not "does not work".
+
+**"What is a permutation test? Holm correction?"**
+Re-run the model many times on shuffled labels and see how often it does as well as on the
+real ones. Holm adjusts p-values because running many tests makes a lucky result likely.
 
 **"Have you actually fused anything yet?"**
 The fusion code is implemented and verified. We have deliberately not reported a
@@ -216,8 +310,10 @@ fused accuracy, because with unpaired datasets there is no ground truth for a
 fused sample. Reporting one would be dishonest.
 
 **"What is the accuracy of your final system?"**
-Text vocabulary: 76.2%. Typing behaviour: not yet at a usable standard, for
-reasons we have tested and documented. Fused: pending paired data.
+Text vocabulary: 76.2% on Dreaddit. Typing behaviour on the 2-person Kaggle
+set: below baseline, for reasons we have tested and documented. SWELL-KW and
+our own paired data: see `outputs/final_report.md` once those datasets are in
+place — `python run_final.py` regenerates every number in one command.
 
 **"Why VADER rather than a transformer like BERT?"**
 VADER is rule-based, interpretable and requires no training. It let us establish
@@ -247,9 +343,20 @@ Those numbers are meaningless and must never appear in a report.
 **Do not present the typing pipeline as successful.** Its best accuracy is below
 the 0.639 majority-class baseline.
 
-**Do not say "we used SWELL-KW" until you actually have it.** Access is pending.
+**Do not oversell SWELL-KW.** The honest summary is "a weak signal on unseen people":
+neutral vs. time pressure, keyboard features, Logistic Regression, macro F1 0.581 (95% CI
+0.539 to 0.625) against 0.500 chance, significant after correction, accuracy at the majority
+level. Neutral was always the first block, so time in the session may explain part of it. Never
+compare a macro F1 with a majority *accuracy*; compare F1 with chance F1
+(1 / number of classes) and accuracy with majority accuracy.
 
-**Fix the PPT title.** Slide 1 currently says "MINOR PROJECT". This is a major.
+**Do not lead with the SWELL 3-class number.** The interruption condition
+changes app switching by design (D21).
+
+**Do not claim fusion improves results.** On real paired data it did not. Never quote
+`outputs/synthetic/` numbers; they are generated.
+
+**Check the PPT title.** Slide 1 of the synopsis deck said "MINOR PROJECT"; the Markdown copy is fixed, make sure the .pptx is too.
 
 ---
 
@@ -267,5 +374,10 @@ Cover the answers above and explain each of these aloud:
 8. Why must SMOTE be applied inside the cross-validation loop?
 9. What does it mean that all three algorithms scored within 1% on the text data?
 10. What is the single strongest text feature, and what does it suggest about stressed writing?
+11. Why must participants be held out as whole groups during evaluation?
+12. What is the difference between early fusion, late fusion and stacking?
+13. Why do both conditions in the collector use questions from the same pool?
+14. Name two columns in sessions.csv that would leak the label, and why.
+15. What does per-participant calibration use from the test person, and what does it not use?
 
-If you can answer all ten without looking, you can defend this project.
+If you can answer all fifteen without looking, you can defend this project.

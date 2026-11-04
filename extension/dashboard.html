@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stress History</title>
+<link rel="icon" href="icons/icon32.png">
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Stress History</h1>
+      <p class="sub">Estimated from your typing. Research prototype, not a medical tool.</p>
+    </div>
+    <button id="clear" class="ghost">Delete all history</button>
+  </header>
+
+  <div class="filters" role="group" aria-label="Period">
+    <button data-range="today">Today</button>
+    <button data-range="yesterday">Yesterday</button>
+    <button data-range="7">7 days</button>
+    <button data-range="30">30 days</button>
+    <button id="siteChip" class="chip" hidden></button>
+    <span class="custom">
+      <label>From <input type="date" id="from"></label>
+      <label>To <input type="date" id="to"></label>
+    </span>
+  </div>
+
+  <p class="warn" id="caveat" hidden></p>
+
+  <p class="empty panel" id="empty" hidden></p>
+
+  <div id="content">
+    <div class="top">
+      <section class="panel hero" aria-label="Overall">
+        <div class="k">Average stress score</div>
+        <div class="heroline">
+          <span class="figure" id="score"></span><span class="outof">/ 100</span>
+          <span class="verdict" id="verdict"></span>
+        </div>
+        <div class="delta" id="delta"></div>
+        <div class="mix" id="mix"></div>
+        <div class="legend" id="mixLegend"></div>
+        <p class="note">Score: the chance of High plus half the chance of Medium, averaged over your estimates.</p>
+      </section>
+      <section class="panel" aria-label="What stands out">
+        <h2>What stands out</h2>
+        <ul class="insights" id="insights"></ul>
+        <p class="note" id="insightNote"></p>
+      </section>
+    </div>
+
+    <section class="tiles" id="tiles" aria-label="Summary"></section>
+
+    <section class="panel">
+      <h2 id="timelineTitle"></h2>
+      <p class="hint" id="timelineHint"></p>
+      <div class="legend" id="legend"></div>
+      <div class="chart" id="timeline"></div>
+    </section>
+
+    <div class="pair" id="pair">
+      <section class="panel" id="sitePanel">
+        <h2>By site</h2>
+        <p class="hint">Highest first. Faded and listed last: fewer than 3 estimates. Click a site to filter this page.</p>
+        <div class="sites" id="sites"></div>
+      </section>
+      <section class="panel" id="heatPanel">
+        <h2>By day and time</h2>
+        <p class="hint">Average score, all selected days combined. Stronger blue is higher. Blank: no estimates.</p>
+        <div class="heatwrap"><table class="heat" id="heat"></table></div>
+        <div class="legend" id="heatLegend"></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <details>
+        <summary>Table view</summary>
+        <div class="tablewrap"><table id="table"></table></div>
+        <div class="tablewrap" id="siteTableWrap"><table id="siteTable"></table></div>
+        <div class="tablewrap" id="heatTableWrap"><table id="heatTable"></table></div>
+      </details>
+    </section>
+  </div>
+
+  <footer>
+    Only estimates are stored (level, probabilities, site name, time), on this computer, for
+    30 days. Never what you typed.
+  </footer>
+</main>
+<div class="tooltip" id="tooltip" role="status" hidden></div>
+<script src="dashboard-data.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>

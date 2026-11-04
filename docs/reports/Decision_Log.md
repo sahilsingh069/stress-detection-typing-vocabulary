@@ -18,6 +18,9 @@ content or were built for authentication rather than stress. Text datasets
 
 **Consequence:** Only late fusion is valid until paired data exists.
 
+**Correction (D23):** SWELL-KW's raw logs can in fact supply paired data once rebuilt.
+The statement above holds for datasets as released, not for what can be derived.
+
 ---
 
 ## D2. Rejected the Kaggle keystroke dataset as a primary source
@@ -152,6 +155,321 @@ variants rather than only the best one.
 
 **Reason:** This constitutes an ablation study, showing what each feature family
 contributes rather than asserting that the full set is best.
+
+---
+
+## D11. Exact dwell-time pairing on the Kaggle data (correction)
+
+**Decision:** Pair each key press with its own release using the row it came
+from, instead of matching by key name.
+
+**Reason:** The Kaggle files mask most keys as `$`. Matching press to release
+by key name mismatches overlapping keystrokes (the next key is often pressed
+before the previous one is released). Each Kaggle row already stores one
+keystroke's press and release time, so the exact pairing was available.
+
+**Measured effect (run_midterm.py):** keystroke + interaction, 3-class, Random
+Forest: macro F1 0.497 -> 0.553, accuracy 0.565 -> 0.629. Binary Random
+Forest 0.519 -> 0.532. Keystroke-only best 0.410 -> 0.406. Cross-user mean
+macro F1 0.403 -> 0.401. **Every configuration is still below the 0.639
+baseline, so the mid-term conclusion is unchanged.** The Progress Report keeps
+its original figures as a record of what was presented; current figures are in
+`outputs/midterm_results.csv`.
+
+---
+
+## D12. Hold out whole participants whenever participants are identifiable
+
+**Decision:** SWELL-KW and own collected data are evaluated with
+`StratifiedGroupKFold` over participants. Random splits are reported only as a
+comparison, to show the size of person leakage.
+
+**Reason:** The Kaggle cross-user test showed a model learns *people* before it
+learns *stress*. A random split would let the same person sit in train and
+test and overstate how the system does on a new user.
+
+---
+
+## D13. Collector v2: chat-style interview instead of one free-writing box
+
+**Decision:** Each condition now has a copy task and a 4-question chat. Every
+chat answer is its own sample. The relaxed-before-pressured order is kept (D7).
+
+**Reason:** One free-writing box per condition gave 2 text samples per
+participant; the chat gives 8, and short conversational answers resemble
+everyday typing more closely than an essay prompt. Typed while a question is
+on screen, the answers are also less self-conscious than "write about your
+stress".
+
+---
+
+## D14. Same topics in both conditions (confound removed)
+
+**Decision:** Chat questions come from one pool of 8 neutral everyday
+questions, shuffled per participant, 4 per condition. The two copy passages
+are matched in length and structure and randomly assigned to conditions.
+
+**Reason:** In v1 the relaxed prompt asked about "your week" and the pressured
+prompt about "something worrying you", and the pressured passage was
+deliberately harder. Any difference between conditions could then come from
+the topic or the text difficulty rather than from stress. Randomising which
+material lands in which condition removes that explanation.
+
+**Trade-off:** neutral topics elicit less stress vocabulary than a "what
+worries you" prompt, so the text signal on our own data may be weaker than on
+Dreaddit. That is the honest measurement of whether stress changes everyday
+vocabulary.
+
+---
+
+## D15. An allow-list of model inputs for own data
+
+**Decision:** The typing models see only `config.OWN_TYPING_FEATURES`, computed
+in Python from the raw keystrokes. The text models drop `word_count`.
+
+**Reason:** `sessions.csv` contains the condition, block, time limit, duration,
+raw key and word counts and the self-ratings. These either are the label or are
+fixed by the timer (timed answers are short because of the timer). A deny-list
+would silently admit any new column; an allow-list cannot leak by accident.
+The browser's own summary statistics are kept in the file for inspection but
+recomputed in Python so the experiments and the demo use one implementation.
+
+---
+
+## D16. SWELL-KW: computer-interaction features only, condition labels
+
+**Decision:** Use the Sn* computer-interaction features. Never use the
+questionnaire columns (Stress, Valence, NASA-TLX, ...) as inputs. Labels come
+from the condition: N -> Low, I -> Medium, T -> High; rest periods dropped.
+A binary view (N vs. I/T) is reported too.
+
+**Reason:** The questionnaire answers are the participant's own stress rating —
+the label in another form. Facial, posture and heart-rate features belong to
+other modalities than this project's. The loader refuses the heart-rate-only
+SWELL derivative with an explanation rather than training on it silently.
+
+**Caveat (for mentor item A5):** "interruptions" is a different stressor, not a
+midpoint between neutral and time pressure. The binary result is therefore the
+cleaner claim; the 3-class result is reported alongside it.
+
+---
+
+## D17. Per-participant calibration reported separately
+
+**Decision:** `run_swell.py` reports, next to the new-person result, a
+calibrated variant in which each participant's features are z-scored against
+their own mean.
+
+**Reason:** Typing speed differs more between people than within a person
+under stress. Calibration uses the test person's unlabelled typing only, which
+models a system that observes a new user before judging them. It is reported
+as its own row and never mixed into the headline.
+
+---
+
+## D18. Demo app shares the experiment code and states its provenance
+
+**Decision:** The demo (`app/server.py`) computes features with the same
+Python functions as the experiments and shows, next to every prediction, which
+dataset each model was trained on and whether it is validated.
+
+**Reason:** A demo with its own feature code drifts from the reported results.
+Until own data exists the typing model can only come from the 2-person Kaggle
+set, which failed the cross-user test; the app says so on screen rather than
+presenting the prediction as validated.
+
+---
+
+## D19. Transformer as an optional comparison, not the reported model
+
+**Decision:** `run_transformer.py` fine-tunes DistilBERT on the identical
+Dreaddit split. It is optional (heavy dependencies) and reported as a
+comparison.
+
+**Reason:** It answers mentor item A6 ("is a transformer expected?") with a
+number: how much accuracy the interpretable pipeline gives up. The classical
+pipeline stays the reported model for the reason in D9.
+
+---
+
+## D20. Real-time feedback through a Chrome extension
+
+**Decision:** Deliver the synopsis objective "work in the background during
+normal typing" as a Chrome extension that analyses typing in web text fields
+through the local server, rather than as a system-wide desktop logger.
+
+**Reason:** A desktop logger records every keystroke in every application,
+including passwords — effectively a keylogger, with operating-system
+permissions and serious consent problems. Most everyday typing (mail, docs,
+chat) happens in the browser, where an extension can see only text fields,
+skip password, email, card and one-time-code fields, be paused per site, and
+be removed in one click. It reuses the server and models of the demo, so the
+feedback a user sees comes from the evaluated pipeline.
+
+**Design choices:** a burst ends after a 2 s pause and needs at least 15 key
+presses; only the text typed in the burst is sent (rebuilt from key presses),
+never the rest of the field; the badge averages the last 5 bursts within 10
+minutes so one burst cannot flip it; a break suggestion needs 3 consecutive
+High bursts and is limited to one per 30 minutes; only estimates are stored.
+The server moved to port 8765 because macOS reserves port 5000 for AirPlay.
+
+---
+
+## D21. SWELL-KW: report neutral vs. time pressure as the clean test
+
+**Correction (D23):** "Clean" overstated this. Neutral is always block 1, so this task
+also compares early with late in the session. The figures below are best-of-three;
+`run_evaluation.py` gives the fixed-model figures (D24).
+
+**Decision:** Besides 3-class and binary, report neutral (N) vs. time pressure
+(T) with interruptions excluded, and a keyboard-only feature set. Compare
+macro F1 with chance macro F1 (1 / number of classes) and accuracy with
+majority accuracy, never one with the other.
+
+**Evidence:** In the interruption condition, app switches average 35 per
+minute against 3 in the others, and error keys 40 against 9: participants
+are made to open and answer e-mails. A model separating I from N may only be
+detecting the task design. N vs. T keeps the task and changes only the
+deadline.
+
+**Result (participants held out):** N vs. T macro F1 0.596 (chance 0.500),
+keyboard only 0.581; accuracy 0.603 vs. 0.608 majority. 3-class 0.424 (chance
+0.333). Per-participant calibration did not help. Reported as a weak but real
+signal, not as a working detector.
+
+**Not done, on purpose:** aggregating minutes into longer windows or tuning
+after seeing these results. That would be choosing the analysis to fit the
+outcome; it can be proposed to the mentor as a pre-declared follow-up.
+
+---
+
+## D22. A stress-history dashboard that does not overstate thin data
+
+**Decision:** Keep estimates for 30 days and show them on a local dashboard, per hour for
+one day and per day for longer periods, as the share of Low / Medium / High estimates.
+
+**Reason:** Users asked to track stress over any period. Shares answer that directly, but a
+bar built from one estimate looks as solid as one built from fifty, so periods with fewer
+than 3 estimates are faded and cannot be named the highest. There is deliberately no single
+"stress score": the models cannot support that precision. A caveat stays on screen while
+any estimate in the period comes from an unvalidated model.
+
+---
+
+## D23. Paired data from SWELL-KW raw logs
+
+**Decision:** Rebuild timing and text from SWELL-KW's raw uLog files, in 5-minute Word
+windows, and run the same fusion comparison as for own data.
+
+**Reason:** Those logs hold each key's timestamp and character for 25 people under
+labelled conditions: the paired data earlier documents said no public source had.
+
+**Rules fixed before running any model:** Word only (PowerPoint is nearly absent from the
+neutral block, e-mail is specific to interruptions); drop the duplicate whitespace event
+uLog records after each Space; at least 100 key presses and 20 words per window; exclude
+the two Dutch writers because the lexicons are English; add `order_control` (block 2 vs. 3)
+because neutral is always first.
+
+**Result:** No stress task is significant after correction, and fusion shows no gain.
+Participants rated time pressure higher under the deadline (p = 0.012), but not stress
+(p = 0.119). This does not replace own data, whose labels and order design are better.
+
+---
+
+## D24. Extended evaluation design, including one corrected mistake
+
+**Decision:** Fix Logistic Regression in advance for headline figures and tests; bootstrap
+whole people; permute labels between a person's blocks as whole units; apply Holm
+correction within each dataset.
+
+**Reason:** Picking the best of three on the same folds is optimistic. Rows from one person
+are not independent, and windows in a block share a label, so resampling or shuffling
+single rows would make results look more certain than they are.
+
+**Mistake corrected:** The first run used 200 shuffles and corrected across all 21 tests,
+including order controls. The lowest possible p-value (0.005) times 21 exceeds 0.05, so
+nothing could pass, not even Dreaddit at 0.765 against 0.517 for shuffled labels. It was
+re-run with 2,000 shuffles for SWELL, Holm within each dataset, and order controls reported
+separately. The grouping was changed after seeing the first output, for that reason.
+
+**Dreaddit check:** One post can yield several rows. Holding out whole posts and using the
+official split gave 0.765 and 0.760 against 0.763 for random folds, so no leakage inflated
+the reported result.
+
+---
+
+## D25. EmoSurv: free text is primary, and labels stay emotions
+
+**Decision:** Add EmoSurv as a second paired dataset, use free text as primary data and report
+fixed text only as confounded. Call the labels emotions throughout.
+
+**Evidence:** Each emotion has its own fixed passage, and neutral's is the longest. Active vs.
+passive scores 0.723 on fixed text and 0.534 on free text. `answer` is blank for all neutral
+rows, so it reveals the label and is never loaded. Neutral rows are removed after subtracting a
+person's neutral block, because they would all be zero.
+
+**Rejected:** Relabelling anger as "High stress" to enlarge the stress data. Anger vs. calm is a
+proxy; renaming it would overstate what was measured.
+
+---
+
+## D26. Report the leakage gap, not the leaky score
+
+**Decision:** Report person-held-out results as ours. Show random-fold scores only in a table
+that measures the gap.
+
+**Evidence:** The same SWELL logs score macro F1 0.816 with random folds over overlapping windows
+and 0.524 with people held out. EmoSurv scores 0.950 with people held out when key composition is
+available, and 0.329 on timing alone.
+
+**Rejected:** Using a 90%+ configuration as the headline. It would match the papers' numbers, but
+it measures recognising people and passages rather than stress.
+
+---
+
+## D27. Text headline is an ensemble declared in advance
+
+**Decision:** Headline 0.808 from the equal-weight ensemble, on the official split.
+
+**Reason:** It was declared before RoBERTa or the ensemble was scored. RoBERTa's 0.813 is
+not measurably different, so switching would only be picking a winner on the test set. The
+ensemble is also better calibrated (0.027 vs. 0.083).
+
+**Consequence:** The demo keeps the interpretable model, which is small and explainable.
+
+---
+
+## D28. Per-person comparison is reported as promising, not established
+
+**Decision:** Report 0.776 per block on SWELL-KW with its corrected p of 0.06, and do not make it
+the headline typing result.
+
+**Reason:** Each task's p-value already accounts for six options, but three tasks were tested, and
+neutral was always first. The order control (block 2 vs. 3) found nothing (p = 0.63), which rules out
+only part of that concern. The same idea did not help on EmoSurv.
+
+---
+
+## D29. Live typing model moves from Kaggle to SWELL-KW logs
+
+**Decision:** Without own data, `train_demo.py` trains typing on SWELL-KW raw logs and falls back
+to Kaggle only if they are absent. The model stays marked unvalidated.
+
+**Reason:** 23 people with stress conditions, against 2 people whose model did not generalise.
+Neither is validated for short live bursts, and the app says so.
+
+---
+
+## D30. Dashboard rebuilt around questions a reader asks
+
+**Decision:** Lead with an average score, then show how it changes, and where and when it is highest.
+
+**Reason:** Stacked level shares per hour collapsed a session into one bar on a 24-hour axis, which
+could not show change or place. The score is the chance of High plus half the chance of Medium,
+which uses the probabilities already stored; no new data is kept.
+
+**Guards:** Sentences need 10+ points and 3+ estimates and do not claim a cause. Heatmap cells with
+too few estimates carry a neutral marker, because fading would read as a lower score.
 
 ---
 

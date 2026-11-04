@@ -165,3 +165,21 @@ We're currently at an initial stage — focused on establishing the core idea, i
 
 **Q: What results do you have so far?**
 > We're at the synopsis stage — our focus has been defining the problem, designing the pipeline, and validating our approach against established datasets. Model training and evaluation results come in the next phase.
+
+---
+
+## Final results (add to the final presentation; figures from `docs/reports/Final_Report.md`)
+
+The slides above describe the plan at synopsis stage. For the final review, use these points:
+
+- **Text works.** Macro F1 0.808 on Dreaddit's official split, against 0.761 for the interpretable model. The Dreaddit model also separates negative from positive emotions on EmoSurv with no retraining (AUC 0.669).
+- **Typing is weak on new people.** 0.581 against 0.500 chance on SWELL-KW. Comparing a person with themselves reached 0.776 per block, but with a corrected p of 0.06, so it is promising only.
+- **Fusion did not help.** No measurable gain on either paired dataset, SWELL-KW or EmoSurv.
+- **Why our typing score is lower than the papers'.** The same logs give 0.816 with random folds over overlapping windows and 0.524 with whole people held out. Ours is the second kind.
+
+**Q: The papers report 83% to 95%. Why is your typing result so much lower?**
+> Mostly the split, and sometimes the sensors. One paper says itself that a student's samples can fall on both sides; another uses phone motion sensors; a third uses ECG. We measured the effect of the split on our own data. We report what happens with a person the model has never seen, because that is what a real user is.
+
+**Q: EmoSurv is about emotion. Why use it for stress?**
+> As a second test of transfer and fusion, not as stress data. We call its labels emotions throughout. Anger vs. calm is our closest proxy, and we say it is only a proxy.
+

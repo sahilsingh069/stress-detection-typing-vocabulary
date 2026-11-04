@@ -108,6 +108,13 @@ Three feature configurations were tested.
 
 Majority-class baseline: 0.639.
 
+> **Post-mid-term correction (Decision Log D11).** Dwell time on this dataset
+> is now paired exactly per keystroke. The figures above are kept as
+> presented; the corrected best 3-class result is Random Forest, accuracy
+> 0.629, macro F1 0.553, and binary Random Forest macro F1 0.532. All
+> configurations remain below the 0.639 baseline and cross-user macro F1 is
+> 0.401, so the conclusion of Section 5 is unchanged.
+
 Adding mouse, idle-period and application-switching features improved the
 three-class macro F1 from 0.410 to 0.497. Collapsing to a binary target improved
 it to 0.524. Despite both improvements, every configuration remains below the

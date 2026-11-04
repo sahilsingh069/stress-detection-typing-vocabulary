@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stress Estimator</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div>
+      <div class="title">Stress Estimator</div>
+      <div class="sub" id="server">checking server…</div>
+    </div>
+    <label class="switch" title="Turn the extension on or off">
+      <input type="checkbox" id="enabled"><span>On</span>
+    </label>
+  </header>
+
+  <section class="now">
+    <div class="k">Recent level <span class="muted" id="window"></span></div>
+    <div class="level" id="level">—</div>
+    <div id="bars"></div>
+    <div class="muted small" id="method"></div>
+  </section>
+
+  <section>
+    <div class="k">Last burst</div>
+    <div class="split">
+      <div><div class="muted small">Typing</div><div class="mini" id="typing">—</div></div>
+      <div><div class="muted small">Text</div><div class="mini" id="text">—</div></div>
+      <div><div class="muted small">When</div><div class="mini" id="when">—</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="k">History <span class="muted">(last 30 estimates, oldest left)</span></div>
+    <div class="strip" id="strip"></div>
+  </section>
+
+  <section class="controls">
+    <label><input type="checkbox" id="pauseSite"> Pause on <b id="site">this site</b></label>
+    <label><input type="checkbox" id="nudges"> Suggest a break when stress stays high</label>
+    <div class="row">
+      <button id="dashboard">View history</button>
+      <button id="clear" class="ghost">Clear</button>
+      <button id="demo" class="ghost">Demo page</button>
+    </div>
+  </section>
+
+  <footer>
+    Typing in text fields is analysed by the server on <b>this computer</b> only.
+    Password and card fields are never read. Only estimates are kept, never
+    what you typed. Research prototype, not a medical tool.
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

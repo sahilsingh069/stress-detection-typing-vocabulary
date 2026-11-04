@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stress Estimator Demo</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E7ECF1; --paper-2:#F2F5F8; --grid:#C9D6E2; --grid-strong:#AFC2D2;
+  --ink:#16202B; --ink-soft:#5A6B7B; --ink-faint:#8B9AA8;
+  --pen:#B3123F; --calm:#0F766E; --mid:#B7791F; --focus:#B3123F;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:22px 22px;color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;line-height:1.55;
+  min-height:100vh;padding:28px 16px 60px;
+}
+.sheet{max-width:1080px;margin:0 auto;background:var(--paper-2);border:1.5px solid var(--ink);box-shadow:6px 6px 0 rgba(22,32,43,.10)}
+.masthead{border-bottom:1.5px solid var(--ink);padding:18px 26px 14px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.masthead h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(20px,3.4vw,27px);letter-spacing:-.02em;margin:0;line-height:1.1}
+.sub{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin-top:5px}
+.srcs{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--ink-soft);padding:3px 8px;color:var(--ink-soft);background:var(--paper)}
+.chip.warn{border-color:var(--pen);color:var(--pen)}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
+.col{padding:22px 26px;min-width:0}
+.col+.col{border-left:1.5px solid var(--ink)}
+h2{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 10px;padding-bottom:5px;border-bottom:1px solid var(--grid-strong);font-weight:500}
+textarea{width:100%;min-height:230px;padding:14px;font-family:'IBM Plex Mono',monospace;font-size:14.5px;line-height:1.65;border:1.5px solid var(--ink);background:var(--paper-2);color:var(--ink);resize:vertical;border-radius:0}
+textarea:focus-visible,button:focus-visible,input:focus-visible{outline:2.5px solid var(--focus);outline-offset:2px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1.5px solid var(--ink);border-top:none}
+.stat{padding:7px 10px;border-right:1px solid var(--grid-strong);min-width:0}
+.stat:last-child{border-right:none}
+.stat .k{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
+.stat .v{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+button{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:15px;padding:10px 20px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper-2);cursor:pointer;border-radius:0}
+button.ghost{background:transparent;color:var(--ink)}
+button:disabled{opacity:.35;cursor:not-allowed}
+label.auto{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);display:flex;gap:6px;align-items:center}
+.weight{margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft)}
+.weight input{width:100%;accent-color:var(--pen)}
+.weight .ends{display:flex;justify-content:space-between}
+
+.card{border:1.5px solid var(--ink);margin-bottom:12px;background:var(--paper-2)}
+.card.main{border-width:2.5px}
+.card .hd{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 12px;border-bottom:1px solid var(--grid-strong)}
+.card .name{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft)}
+.card .verdict{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:-.01em}
+.card.main .verdict{font-size:30px}
+.card .bd{padding:10px 12px}
+.bar{display:grid;grid-template-columns:64px minmax(0,1fr) 46px;gap:8px;align-items:center;margin:4px 0;font-family:'IBM Plex Mono',monospace;font-size:12px}
+.track{height:10px;background:var(--paper);border:1px solid var(--grid-strong)}
+.fill{height:100%;width:0;transition:width .25s ease}
+.fill.Low{background:var(--calm)} .fill.Medium{background:var(--mid)} .fill.High{background:var(--pen)}
+.pct{text-align:right;font-variant-numeric:tabular-nums}
+.v-Low{color:var(--calm)} .v-Medium{color:var(--mid)} .v-High{color:var(--pen)}
+.note{font-size:12.5px;color:var(--ink-soft);margin-top:6px}
+.empty{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-faint);padding:4px 0}
+.feats{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:12px;margin-top:4px}
+.feats td{padding:3px 4px;border-bottom:1px solid var(--grid)}
+.feats td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.banner{padding:12px 26px;border-bottom:1.5px solid var(--pen);background:rgba(179,18,63,.06);font-size:14px;display:none}
+.banner.on{display:block}
+.banner code{font-family:'IBM Plex Mono',monospace;background:var(--paper);padding:1px 5px}
+.foot{border-top:1.5px solid var(--ink);padding:10px 26px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft)}
+@media (max-width:820px){.grid{grid-template-columns:1fr}.col+.col{border-left:none;border-top:1.5px solid var(--ink)}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:nth-child(2){border-right:none}.stat:nth-child(-n+2){border-bottom:1px solid var(--grid-strong)}}
+@media (max-width:560px){body{padding:12px 8px 40px}.col{padding:16px}.masthead{padding:14px 16px}}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="masthead">
+    <div>
+      <h1>Stress Estimator</h1>
+      <div class="sub">Typing behaviour + text vocabulary · live demo</div>
+    </div>
+    <div class="srcs" id="sources"></div>
+  </div>
+
+  <div class="banner" id="notReady">
+    No trained models found. In the project folder run <code>python train_demo.py</code>
+    (or <code>python train_demo.py --source synthetic</code> to try it without data), then reload this page.
+  </div>
+
+  <div class="grid">
+    <div class="col">
+      <h2>Type here</h2>
+      <textarea id="box" spellcheck="false" autocomplete="off" autocapitalize="off"
+        placeholder="Write a few sentences about your day, what you are working on, or anything on your mind…"></textarea>
+      <div class="stats">
+        <div class="stat"><div class="k">Keys</div><div class="v" id="sKeys">0</div></div>
+        <div class="stat"><div class="k">Words</div><div class="v" id="sWords">0</div></div>
+        <div class="stat"><div class="k">Corrections</div><div class="v" id="sBack">0</div></div>
+        <div class="stat"><div class="k">Median gap ms</div><div class="v" id="sIki">—</div></div>
+      </div>
+      <div class="actions">
+        <button id="btnGo">Analyse</button>
+        <button class="ghost" id="btnClear">Clear</button>
+        <label class="auto"><input type="checkbox" id="auto" checked> analyse when I pause</label>
+      </div>
+      <div class="weight">
+        Late-fusion weight on typing: <b id="wVal">0.50</b>
+        <input type="range" id="w" min="0" max="1" step="0.05" value="0.5" aria-label="Typing weight">
+        <div class="ends"><span>text only</span><span>typing only</span></div>
+      </div>
+      <p class="note" style="margin-top:14px">Pasting is disabled: the typing estimate needs your live keystrokes.
+        Nothing you type is stored; it is analysed in memory on this computer and discarded.</p>
+    </div>
+
+    <div class="col">
+      <h2>Estimate</h2>
+      <div id="cards"></div>
+      <div id="warnings"></div>
+      <h2 style="margin-top:18px">What the models measured</h2>
+      <div id="features"><div class="empty">Start typing.</div></div>
+    </div>
+  </div>
+
+  <div class="foot">A research prototype from a student major project (UPES). Not a medical or diagnostic tool.</div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const box = $("box");
+let events = [], t0 = null, lastDown = null, ikis = [], backs = 0, timer = null, busy = false, status = null;
+
+const LABELS = ["Low","Medium","High"];
+const SOURCE_NAMES = {own:"own collected data", dreaddit:"Dreaddit", swell:"SWELL-KW (23 people)", kaggle:"Kaggle (2 people)", synthetic:"synthetic"};
+const FEATURE_NAMES = {
+  typing_speed_cpm:"Typing speed (keys/min)", mean_flight_ms:"Mean gap between keys (ms)",
+  std_flight_ms:"Gap variability (ms)", median_flight_ms:"Median gap (ms)",
+  backspace_rate:"Correction rate", special_key_rate:"Special-key rate",
+  long_pause_rate:"Pauses over 2 s (rate)", rhythm_variability:"Rhythm irregularity",
+  mean_dwell_ms:"Mean key hold (ms)", std_dwell_ms:"Key hold variability (ms)", n_keystrokes:"Key presses",
+  sent_compound:"Overall sentiment (−1…+1)", sent_neg:"Negative sentiment",
+  first_person_ratio:"First-person words (I, me, my)", negative_word_ratio:"Negative words",
+  stress_word_ratio:"Stress words", lexical_diversity:"Vocabulary variety"
+};
+
+function median(a){ if(!a.length) return null; const s=[...a].sort((x,y)=>x-y), m=s.length>>1; return s.length%2?s[m]:(s[m-1]+s[m])/2; }
+
+box.addEventListener("paste", e => e.preventDefault());
+box.addEventListener("drop", e => e.preventDefault());
+box.addEventListener("keydown", e => {
+  const now = performance.now();
+  if(t0 === null) t0 = now;
+  const t = now - t0;
+  if(lastDown !== null){ const g = t - lastDown; if(g >= 0 && g < 60000) ikis.push(g); }
+  lastDown = t;
+  if(e.key === "Backspace" || e.key === "Delete") backs++;
+  events.push({ev:"down", key:e.key, code:e.code, t:+t.toFixed(2)});
+  stats(); schedule();
+});
+box.addEventListener("keyup", e => {
+  if(t0 === null) return;
+  events.push({ev:"up", key:e.key, code:e.code, t:+(performance.now()-t0).toFixed(2)});
+});
+
+function stats(){
+  $("sKeys").textContent = events.filter(e=>e.ev==="down").length;
+  $("sWords").textContent = box.value.trim() ? box.value.trim().split(/\s+/).length : 0;
+  $("sBack").textContent = backs;
+  const m = median(ikis); $("sIki").textContent = m===null ? "—" : Math.round(m);
+}
+function schedule(){
+  clearTimeout(timer);
+  if($("auto").checked) timer = setTimeout(analyse, 1200);
+}
+
+$("w").addEventListener("input", () => { $("wVal").textContent = (+$("w").value).toFixed(2); });
+$("w").addEventListener("change", () => { if(events.length) analyse(); });
+$("btnGo").addEventListener("click", analyse);
+$("btnClear").addEventListener("click", () => {
+  box.value = ""; events = []; t0 = null; lastDown = null; ikis = []; backs = 0;
+  stats(); $("cards").innerHTML = ""; $("warnings").innerHTML = "";
+  $("features").innerHTML = '<div class="empty">Start typing.</div>'; box.focus();
+});
+
+async function analyse(){
+  if(busy || !status || !status.ready) return;
+  busy = true; $("btnGo").disabled = true;
+  try{
+    const r = await fetch("/api/predict", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({text: box.value, events, weight: +$("w").value})});
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error || r.statusText);
+    render(data);
+  }catch(err){
+    $("warnings").innerHTML = ""; $("warnings").appendChild(note("Request failed: " + err.message));
+  }finally{ busy = false; $("btnGo").disabled = false; }
+}
+
+function note(text){ const p = document.createElement("p"); p.className = "note"; p.textContent = text; return p; }
+
+function card(title, res, main){
+  const c = document.createElement("div"); c.className = "card" + (main ? " main" : "");
+  const hd = document.createElement("div"); hd.className = "hd";
+  const n = document.createElement("div"); n.className = "name"; n.textContent = title;
+  const v = document.createElement("div"); v.className = "verdict";
+  hd.append(n, v); c.appendChild(hd);
+  const bd = document.createElement("div"); bd.className = "bd"; c.appendChild(bd);
+  if(!res){ v.textContent = "—"; const e = document.createElement("div"); e.className="empty"; e.textContent="Needs more input."; bd.appendChild(e); return c; }
+  v.textContent = res.label; v.classList.add("v-"+res.label);
+  LABELS.forEach(l => {
+    const row = document.createElement("div"); row.className = "bar";
+    const lab = document.createElement("span"); lab.textContent = l;
+    const tr = document.createElement("div"); tr.className = "track";
+    const f = document.createElement("div"); f.className = "fill " + l; tr.appendChild(f);
+    const pc = document.createElement("span"); pc.className = "pct"; pc.textContent = Math.round(res.probs[l]*100) + "%";
+    row.append(lab, tr, pc); bd.appendChild(row);
+    requestAnimationFrame(()=>{ f.style.width = (res.probs[l]*100) + "%"; });
+  });
+  const meta = note(`Confidence ${Math.round(res.confidence*100)}% · model: ${SOURCE_NAMES[res.source] || res.source}` +
+                    (res.validated ? "" : " · not validated"));
+  bd.appendChild(meta);
+  if(res.note) bd.appendChild(note(res.note));
+  return c;
+}
+
+function render(d){
+  const cards = $("cards"); cards.innerHTML = "";
+  cards.appendChild(card("Combined estimate", d.fused, true));
+  if(d.early) cards.appendChild(card("Early fusion (one model, both inputs)", d.early));
+  cards.appendChild(card("From typing behaviour", d.typing));
+  cards.appendChild(card("From text vocabulary", d.text));
+  $("warnings").innerHTML = ""; (d.warnings||[]).forEach(w => $("warnings").appendChild(note(w)));
+
+  const f = $("features"); f.innerHTML = "";
+  const t = document.createElement("table"); t.className = "feats";
+  [["typing", d.features.typing], ["text", d.features.text]].forEach(([_, obj]) => {
+    if(!obj) return;
+    Object.entries(obj).forEach(([k, v]) => {
+      const tr = document.createElement("tr");
+      const a = document.createElement("td"); a.textContent = FEATURE_NAMES[k] || k;
+      const b = document.createElement("td"); b.textContent = v === null ? "—" : (Math.abs(v) >= 10 ? Math.round(v) : v.toFixed(3));
+      tr.append(a, b); t.appendChild(tr);
+    });
+  });
+  if(t.rows.length) f.appendChild(t); else f.innerHTML = '<div class="empty">Not enough input yet.</div>';
+}
+
+async function loadStatus(){
+  try{
+    status = await (await fetch("/api/status")).json();
+  }catch(_){ status = {ready:false}; }
+  $("notReady").classList.toggle("on", !status.ready);
+  const s = $("sources"); s.innerHTML = "";
+  const models = (status.meta && status.meta.models) || {};
+  Object.entries(models).forEach(([k, m]) => {
+    const c = document.createElement("span"); c.className = "chip" + (m.validated ? "" : " warn");
+    c.textContent = `${k}: ${SOURCE_NAMES[m.source] || m.source}`;
+    s.appendChild(c);
+  });
+  if(status.meta && status.meta.fusion_weight_typing !== undefined){
+    $("w").value = status.meta.fusion_weight_typing; $("wVal").textContent = (+$("w").value).toFixed(2);
+  }
+}
+loadStatus();
+box.focus();
+</script>
+</body>
+</html>

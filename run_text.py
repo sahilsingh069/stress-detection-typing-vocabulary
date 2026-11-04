@@ -33,17 +33,28 @@ def load_data(source: str) -> pd.DataFrame:
         print(f"Loading Dreaddit from {config.DREADDIT_TRAIN_PATH} ...")
         return loaders.load_dreaddit()
     if source == "own":
-        print(f"Loading collected sessions from {config.DATA_DIR / 'own'} ...")
-        return loaders.load_own_sessions()
+        print(f"Loading collected sessions from {config.OWN_DIR} ...")
+        df = loaders.load_own_sessions()
+        # copy tasks reproduce a fixed passage: no vocabulary signal
+        df = df[df["task_type"].isin(config.OWN_TEXT_TASKS)
+                & df["text"].str.strip().astype(bool)]
+        print(f"  {len(df)} chat / free-text answers kept")
+        return df.reset_index(drop=True)
     print("Loading SYNTHETIC text data (development only) ...")
     return loaders.load_synthetic_text()
 
 
 def main(source: str, save_models: bool):
+    # synthetic smoke tests never overwrite real results
+    out_dir = config.OUTPUT_DIR / "synthetic" if source == "synthetic" else config.OUTPUT_DIR
     df = load_data(source)
     print(f"Sentiment backend: {text_features.sentiment_backend()}")
+    groups = df["participant_id"].astype(str).to_numpy() if source == "own" else None
 
     ling = text_features.build_text_features(df["text"])
+    if source == "own":
+        # answer length is capped by the timer, so it would measure the timer
+        ling = ling.drop(columns=config.PAIRED_EXCLUDED_TEXT_FEATURES)
     X = pd.concat([df[["text"]].reset_index(drop=True), ling], axis=1)
     y = df["stress_label"].astype(str)
     ling_cols = list(ling.columns)
@@ -52,12 +63,16 @@ def main(source: str, save_models: bool):
     print("Class distribution:")
     print(y.value_counts().to_string())
 
-    X_tr, X_te, y_tr, y_te = train_test_split(
-        X, y,
-        test_size=config.TEST_SIZE,
-        random_state=config.RANDOM_STATE,
-        stratify=y if y.value_counts().min() >= 2 else None,
-    )
+    if groups is not None:
+        X_tr, X_te, y_tr, y_te = evaluation.grouped_train_test_split(X, y, groups)
+        print("\nTest set = whole held-out participants")
+    else:
+        X_tr, X_te, y_tr, y_te = train_test_split(
+            X, y,
+            test_size=config.TEST_SIZE,
+            random_state=config.RANDOM_STATE,
+            stratify=y if y.value_counts().min() >= 2 else None,
+        )
     print(f"\nTrain: {len(X_tr)}  Test: {len(X_te)}")
     print(f"Imbalance strategy: {config.IMBALANCE_STRATEGY}")
 
@@ -68,20 +83,21 @@ def main(source: str, save_models: bool):
         y_pred = pipe.predict(X_te)
 
         row = evaluation.evaluate_model(y_te, y_pred, name)
-        row.update(evaluation.cross_validate(pipe, X, y))
+        row.update(evaluation.cross_validate(pipe, X, y, groups=groups))
         results.append(row)
         fitted[name] = pipe
 
         evaluation.print_report(y_te, y_pred, f"Text / {name}")
-        path = evaluation.save_confusion_matrix(y_te, y_pred, f"text_{name}")
+        path = evaluation.save_confusion_matrix(y_te, y_pred, f"text_{name}",
+                                                out_dir=out_dir)
         print(f"saved: {path}")
 
     table = evaluation.results_table(results)
     print("\n================ TEXT PIPELINE RESULTS ================")
     print(table.to_string(index=False))
 
-    config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = config.OUTPUT_DIR / "results_text.csv"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / "results_text.csv"
     table.to_csv(out, index=False)
     print(f"\nsaved: {out}")
 
@@ -93,13 +109,13 @@ def main(source: str, save_models: bool):
     if imp is not None:
         print("\nTop linguistic features (Random Forest importance):")
         print(imp.to_string(index=False))
-        imp.to_csv(config.OUTPUT_DIR / "feature_importance_text.csv",
+        imp.to_csv(out_dir / "feature_importance_text.csv",
                    index=False)
 
     if save_models:
         for name, pipe in fitted.items():
-            joblib.dump(pipe, config.OUTPUT_DIR / f"model_text_{name}.joblib")
-        print(f"\nmodels saved to {config.OUTPUT_DIR}")
+            joblib.dump(pipe, out_dir / f"model_text_{name}.joblib")
+        print(f"\nmodels saved to {out_dir}")
 
 
 if __name__ == "__main__":

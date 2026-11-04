@@ -4,8 +4,8 @@ application switching.
 
 These come from the Kaggle keystroke dataset's companion files, which sit
 alongside keystrokes.tsv but were unused in the first pass. Adding them
-measurably improved the typing pipeline (macro F1 0.354 -> 0.438 on 3-class,
-0.487 -> 0.540 on binary), because stress shows up in idle patterns and task
+measurably improved the typing pipeline (best 3-class macro F1 0.406 -> 0.553
+in run_midterm.py), because stress shows up in idle patterns and task
 switching as well as in typing rhythm.
 
 SWELL-KW logs the same families of signal, so the same feature names carry

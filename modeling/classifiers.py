@@ -22,6 +22,7 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline as SkPipeline
 from sklearn.preprocessing import StandardScaler
@@ -80,15 +81,24 @@ def _wrap(steps: list, strategy: str) -> SkPipeline:
     return SkPipeline(steps)
 
 
+def _numeric_branch() -> SkPipeline:
+    # Imputation sits inside the pipeline so medians come from training
+    # folds only (e.g. dwell time is missing when no key releases were seen).
+    return SkPipeline([("impute", SimpleImputer(strategy="median")),
+                       ("scale", StandardScaler())])
+
+
 # --------------------------------------------------------------------------
-# typing pipeline: scale -> classifier
+# typing pipeline: impute -> scale -> classifier
 # --------------------------------------------------------------------------
 def build_typing_pipeline(
     estimator, strategy: str | None = None
 ) -> SkPipeline:
     strategy = strategy or config.IMBALANCE_STRATEGY
     return _wrap(
-        [("scaler", StandardScaler()), ("clf", estimator)], strategy
+        [("impute", SimpleImputer(strategy="median")),
+         ("scaler", StandardScaler()), ("clf", estimator)],
+        strategy,
     )
 
 
@@ -117,6 +127,42 @@ def build_text_pipeline(
                 "text",
             ),
             ("ling", StandardScaler(), linguistic_cols),
+        ],
+        remainder="drop",
+    )
+    return _wrap([("pre", pre), ("clf", estimator)], strategy)
+
+
+# --------------------------------------------------------------------------
+# early fusion: [TF-IDF] + [linguistic] + [typing] -> one classifier
+# --------------------------------------------------------------------------
+def build_early_fusion_pipeline(
+    estimator,
+    linguistic_cols: list[str],
+    typing_cols: list[str],
+    strategy: str | None = None,
+) -> SkPipeline:
+    """
+    Feature-level fusion: both modalities of the SAME session are
+    concatenated into one vector before a single classifier. Only valid on
+    paired data (own collected sessions), where typing and text share one
+    stress label.
+    """
+    strategy = strategy or config.IMBALANCE_STRATEGY
+    pre = ColumnTransformer(
+        transformers=[
+            (
+                "tfidf",
+                TfidfVectorizer(
+                    max_features=config.TFIDF_MAX_FEATURES,
+                    ngram_range=config.TFIDF_NGRAM_RANGE,
+                    stop_words="english",
+                    sublinear_tf=True,
+                ),
+                "text",
+            ),
+            ("ling", StandardScaler(), linguistic_cols),
+            ("typing", _numeric_branch(), typing_cols),
         ],
         remainder="drop",
     )

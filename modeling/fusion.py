@@ -1,17 +1,21 @@
 """
 Late (decision-level) fusion.
 
-Why late fusion: SWELL-KW gives us typing behaviour and Dreaddit gives us
-text, but they come from DIFFERENT people - there are no paired rows, so a
-single concatenated feature vector (early fusion) is not possible yet. Late
-fusion trains one model per modality independently and combines only their
-predicted probabilities at inference time.
+Why late fusion: SWELL-KW / Kaggle give us typing behaviour and Dreaddit
+gives us text, but they come from DIFFERENT people - there are no paired
+rows, so a single concatenated feature vector (early fusion) is impossible on
+them. Late fusion trains one model per modality independently and combines
+only their predicted probabilities at inference time.
+
+On our own collected (paired) sessions both are possible: early fusion lives
+in modeling.classifiers.build_early_fusion_pipeline and run_paired.py
+compares it against every rule here.
 
 Three combination rules are provided:
     weighted_average  - w * P_typing + (1-w) * P_text
     max_confidence    - take whichever modality is more confident
     stacking          - a small meta-classifier trained on both prob vectors
-                        (requires paired data; use once you collect your own)
+                        (requires paired data: run_paired.py)
 
 `align_classes` handles the fact that Dreaddit is binary (Low/High) while the
 typing stream is 3-class (Low/Medium/High): probabilities are expanded onto

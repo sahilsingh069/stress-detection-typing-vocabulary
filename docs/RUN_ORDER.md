@@ -8,8 +8,6 @@ directly contains `config.py`.
 
 ## 0. One-time setup
 
-Open the project folder in VS Code (`File → Open Folder`), then in the terminal:
-
 ```bash
 pip install -r requirements.txt
 ```
@@ -18,113 +16,159 @@ pip install -r requirements.txt
 python -c "import nltk; nltk.download('vader_lexicon')"
 ```
 
-If that second command fails (no internet, firewall), do nothing — the code
+If the second command fails (no internet, firewall), do nothing — the code
 falls back to a built-in sentiment lexicon automatically. Everything still runs.
+
+Optional, only for the transformer comparison (large download):
+
+```bash
+pip install -r requirements-transformer.txt
+```
 
 ---
 
 ## 1. Place the datasets
 
-Before running anything real, put files here:
-
-| Dataset | Path |
-|---|---|
-| Dreaddit | `data/dreaddit-train.csv`, `data/dreaddit-test.csv` |
-| Kaggle keystroke archive, extracted | `data/Data/user 1/...`, `data/Data/user 2/...` |
-| SWELL-KW, once you have it | `data/swell_kw.csv` |
-| Your own collected sessions | `data/own/sessions_*.csv`, `data/own/keystrokes_*.csv` |
-
-`data/README.md` in the project has the same table. Nothing in step 2 needs
-this — only steps 3 onward do.
+| Dataset | Path | Status |
+|---|---|---|
+| Dreaddit | `data/dreaddit-train.csv`, `data/dreaddit-test.csv` | included |
+| Kaggle keystroke archive, extracted | `data/Data/user 1/...`, `data/Data/user 2/...` | included |
+| SWELL-KW computer-interaction features | `data/swell_kw.csv` | once access is granted |
+| EmoSurv | the four CSV files named in `data/README.md` | included |
+| Your own collected sessions | `data/own/sessions_*.csv`, `data/own/keystrokes_*.csv` | after collection |
 
 ---
 
 ## 2. Smoke test — confirm the code runs, no data needed
 
 ```bash
-python run_typing.py --source synthetic
+python -m unittest discover -s tests
+python run_paired.py --source synthetic
+python run_swell.py --source synthetic
 ```
 
-```bash
-python run_text.py --source synthetic
-```
-
-These use fake generated data with a planted signal, purely to prove the code
-path works end to end. **Never quote these numbers anywhere** — they will look
-artificially perfect (close to 100%) and mean nothing. If both commands finish
-without errors and print a results table, you're set up correctly. Move on.
+These use generated data with a planted signal, purely to prove each code path
+works end to end. **Never quote these numbers anywhere.** Their output goes to
+`outputs/synthetic/`, away from real results.
 
 ---
 
-## 3. Real runs — individual pipelines
-
-Only after step 1's data is in place.
+## 3. The one command that matters
 
 ```bash
-python run_typing.py --source kaggle
+python run_final.py
 ```
-Reads `data/Data/`, extracts keystroke features, trains and compares three
-classifiers, writes `outputs/results_typing.csv` and confusion-matrix PNGs.
 
-```bash
-python run_text.py --source dreaddit
-```
-Reads the two Dreaddit CSVs, extracts sentiment/lexical features, trains and
-compares three classifiers, writes `outputs/results_text.csv`.
+Runs everything the data in `data/` supports and skips the rest, with the
+reason printed:
 
-Run these two independently whenever you want to test a change to just one
-pipeline — they're faster than the full mid-term run below because they don't
-grid-search hyperparameters.
+| Step | Runs when | Writes |
+|---|---|---|
+| Dreaddit text + Kaggle typing (grid search) | always | `outputs/midterm_*`, confusion PNGs |
+| SWELL-KW experiment | `data/swell_kw.csv` exists | `outputs/swell/` |
+| Paired experiment (early / late fusion, stacking) | `data/own/` has exports | `outputs/paired/` |
+| EmoSurv experiment (about 25 min; `--quick` reuses it) | its four files are in `data/` | `outputs/emosurv/` |
+| Transformer results | `run_transformer.py` has been run | included in the summary |
+| Demo models | always | `outputs/demo/` |
+
+Then read `outputs/final_report.md`. Takes about a minute without own data.
+`python run_final.py --quick` reuses the last Dreaddit/Kaggle run.
 
 ---
 
-## 4. Fusion mechanism check
+## 4. Individual experiments
 
 ```bash
-python run_fusion.py --typing-source kaggle --text-source dreaddit --weight 0.5
+python run_midterm.py                 # Dreaddit + Kaggle, grid-searched
+python run_swell.py                   # SWELL-KW (or --path some_file.csv)
+python run_paired.py                  # own collected data
+python run_transformer.py             # optional DistilBERT comparison (~7 min on Apple GPU)
 ```
 
-Trains both pipelines again internally and demonstrates combining their
-predictions. Prints no fused accuracy on purpose — see `docs/reports/Decision_Log.md`
-item D6 for why.
+Single pipelines, faster, no grid search:
+
+```bash
+python run_typing.py --source kaggle      # or swell / own
+python run_text.py   --source dreaddit    # or own
+python run_fusion.py --typing-source kaggle --text-source dreaddit
+```
+
+`run_fusion.py` deliberately prints no fused accuracy: the public datasets are
+unpaired (Decision Log D6). Real fusion results come from `run_paired.py`.
 
 ---
 
-## 5. The full mid-term run — this is the one that matters
+## 4b. Paired data and extended evaluation
 
 ```bash
-python run_midterm.py
+python -m dataio.swell_raw      # once: downloads SWELL-KW raw logs (~400 MB)
+python run_swell_paired.py      # typing vs text vs fusion on real paired data
+python run_evaluation.py        # AUC, calibration, CIs, significance (up to ~1 hour)
 ```
 
-This is the command that actually produced every number in
-`docs/reports/Progress_Report.md`. It does more than steps 3–4 combined:
-
-- Grid-searches hyperparameters for all three classifiers
-- Runs the typing pipeline in three configurations (keystroke-only, +
-  interaction features, binary)
-- Runs the cross-user generalisation test
-- Writes everything to `outputs/`: `midterm_results.csv`, `midterm_report.md`,
-  nine confusion matrices, feature-importance CSVs, and the trained `.joblib`
-  models
-
-Takes a few minutes. If you only run one command after setup, run this one.
+Read `outputs/evaluation/report_evaluation.md`. `python run_evaluation.py --quick` only
+checks that it works: its repeats are too few to quote.
 
 ---
 
-## 6. Once you have your own collected data
-
-`data/own/` is where `sessions_*.csv` and `keystrokes_*.csv` from
-`collector/typing_collector.html` go. Once you have enough participants and
-all classes have at least two sessions, use:
+## 4c. Final-report experiments
 
 ```bash
-python run_typing.py --source own
-python run_text.py --source own
+python run_emosurv.py                 # typing, text transfer and fusion on EmoSurv
+python run_improve.py                 # per-person comparison, with order control
+python run_leakage.py                 # the same data under leaky and honest splits
+
+# needs requirements-transformer.txt; about 25 min on an Apple GPU
+python run_transformer.py --split official
+python run_transformer.py --split official --model roberta-base
+python run_text_ensemble.py
 ```
 
-The typing runner deliberately excludes post-task self-ratings and study
-condition metadata from model inputs, so it learns from behaviour rather than
-from fields that would leak the answer.
+---
+
+## 5. Collect data
+
+Follow `docs/Data_Collection_Protocol.md`. In short: open
+`collector/typing_collector.html` in Chrome, run each participant through the
+four blocks, download both CSV files, put them in `data/own/`. Then:
+
+```bash
+python run_paired.py
+```
+
+or simply `python run_final.py` again.
+
+---
+
+## 6. The demo
+
+```bash
+python train_demo.py        # builds outputs/demo/ from the best available data
+python app/server.py        # open http://127.0.0.1:8765
+```
+
+Type in the box; the page shows the typing estimate, the text estimate, the
+combined estimate (and early fusion once own data exists), plus the features
+each model measured. Re-run `train_demo.py` after collecting data so the demo
+uses models trained on your participants. `Ctrl+C` stops the server.
+
+To try the app's full layout before collecting, `python train_demo.py --source
+synthetic` (predictions are then meaningless, and the page says so).
+
+---
+
+## 7. Real-time feedback — the Chrome extension
+
+With the server from step 6 running:
+
+1. Chrome → `chrome://extensions` → turn on **Developer mode**.
+2. **Load unpacked** → select the project's `extension/` folder.
+3. Pin it (puzzle-piece icon → pin **Stress Estimator**).
+
+Type in any text box on any website and pause for 2 seconds: the toolbar badge
+shows LOW / MED / HIGH. Click it for details and controls. Full guide:
+`extension/README.md`. The server must stay running (`!` on the badge means it
+is not).
 
 ---
 
@@ -133,14 +177,11 @@ from fields that would leak the answer.
 ```bash
 pip install -r requirements.txt
 python -c "import nltk; nltk.download('vader_lexicon')"
+python -m unittest discover -s tests
 
-python run_typing.py --source synthetic
-python run_text.py   --source synthetic
+python run_final.py
+python app/server.py        # + load extension/ in Chrome
 
-# place datasets in data/, then:
-
-python run_typing.py --source kaggle
-python run_text.py   --source dreaddit
-python run_fusion.py --typing-source kaggle --text-source dreaddit
-python run_midterm.py
+# after collecting data into data/own/ (and/or adding data/swell_kw.csv):
+python run_final.py
 ```

@@ -8,9 +8,9 @@ IMPORTANT - read before quoting any number from this script:
 SWELL-KW and Dreaddit are not paired (different people, different sessions),
 so there is no ground truth for a fused sample. This script therefore
 demonstrates that the fusion MECHANISM works and is correctly implemented; it
-does not report a validated fused accuracy. Once you collect paired data
-(same session -> typing + text + one stress label), pass it here and the same
-code produces genuine fused results, plus StackingFusion becomes usable.
+does not report a validated fused accuracy. For genuine fused results on
+paired data (same session -> typing + text + one stress label), use
+run_paired.py, which also compares early fusion and stacking.
 
 Usage:
     python run_fusion.py --typing-source synthetic --text-source synthetic

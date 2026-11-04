@@ -22,7 +22,13 @@ SWELL-KW for the behavioural modality.
 - Or do you expect a single unified dataset, in which case our own collection
   becomes the only option?
 
-### A2. SWELL-KW access — request for your help
+### A2. SWELL-KW access — RESOLVED
+
+*Update: the dataset turned out to be openly available on DANS (CC BY-NC-SA
+4.0) and has been downloaded and evaluated; see `outputs/swell/report_swell.md`.
+The original question is kept below for the record.*
+
+#### Original question
 SWELL-KW (Radboud University, 25 participants, validated stress labels) requires
 registration and approval. This is currently our main blocker for the typing
 pipeline.

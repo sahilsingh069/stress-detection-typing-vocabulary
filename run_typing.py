@@ -9,6 +9,11 @@ Usage:
 
 Trains Logistic Regression, Random Forest and SVM, prints a comparison table,
 saves confusion matrices and the Random Forest feature importances.
+
+When the data identifies participants (SWELL-KW, own sessions) the test set
+is made of whole held-out participants, and cross-validation is grouped the
+same way. Kaggle has only two people, so it keeps the random split; see
+run_midterm.py for its cross-user test.
 """
 
 from __future__ import annotations
@@ -28,10 +33,11 @@ from modeling import classifiers, evaluation
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def load_data(source: str) -> pd.DataFrame:
+def load_data(source: str) -> tuple[pd.DataFrame, str | None]:
+    """Returns (frame, name of the participant column or None)."""
     if source == "swell":
         print(f"Loading SWELL-KW from {config.SWELL_PATH} ...")
-        return loaders.load_swell()
+        return loaders.load_swell(), "participant"
 
     if source == "kaggle":
         print(f"Loading Kaggle keystroke logs from "
@@ -40,41 +46,48 @@ def load_data(source: str) -> pd.DataFrame:
         print(f"  {len(events):,} keystroke events loaded")
         df = typing_features.features_from_events(events)
         print(f"  aggregated into {len(df)} session windows")
-        return df
+        return df, None
 
     if source == "own":
-        print(f"Loading collected sessions from {config.DATA_DIR / 'own'} ...")
-        return loaders.load_own_sessions()
+        print(f"Loading collected sessions from {config.OWN_DIR} ...")
+        return loaders.load_own_paired(), "participant_id"
 
     print("Loading SYNTHETIC typing data (development only) ...")
-    return loaders.load_synthetic_typing()
+    return loaders.load_synthetic_typing(), None
 
 
-OWN_NON_BEHAVIOURAL_COLUMNS = [
-    "text", "block", "condition", "task_type", "time_limit_s", "timed_out",
-    "self_report_intensity", "self_report_pressure", "age_band",
-    "typing_familiarity", "started_at", "ended_at", "char_count", "word_count",
-]
+def feature_matrix(df: pd.DataFrame, source: str) -> tuple[pd.DataFrame, pd.Series]:
+    if source == "own":
+        # explicit allow-list: everything else in the session file is either
+        # the label (self-ratings, condition) or fixed by the timer
+        cols = [c for c in config.OWN_TYPING_FEATURES if c in df.columns]
+        return df[cols], df["stress_label"].astype(str)
+    return typing_features.prepare_feature_frame(df)
 
 
 def main(source: str, save_models: bool):
-    df = load_data(source)
-    X, y = typing_features.prepare_feature_frame(
-        df,
-        excluded_columns=OWN_NON_BEHAVIOURAL_COLUMNS if source == "own" else None,
-    )
+    # synthetic smoke tests never overwrite real results
+    out_dir = config.OUTPUT_DIR / "synthetic" if source == "synthetic" else config.OUTPUT_DIR
+    df, group_col = load_data(source)
+    X, y = feature_matrix(df, source)
+    groups = df[group_col].astype(str).to_numpy() if group_col else None
 
     print(f"\nFeature matrix: {X.shape[0]} samples x {X.shape[1]} features")
     print("Class distribution:")
     print(y.value_counts().to_string())
 
-    X_tr, X_te, y_tr, y_te = train_test_split(
-        X, y,
-        test_size=config.TEST_SIZE,
-        random_state=config.RANDOM_STATE,
-        stratify=y if y.value_counts().min() >= 2 else None,
-    )
-    print(f"\nTrain: {len(X_tr)}  Test: {len(X_te)}")
+    if groups is not None:
+        X_tr, X_te, y_tr, y_te = evaluation.grouped_train_test_split(X, y, groups)
+        print(f"\nTest set = whole held-out participants "
+              f"({len(set(groups))} participants in total)")
+    else:
+        X_tr, X_te, y_tr, y_te = train_test_split(
+            X, y,
+            test_size=config.TEST_SIZE,
+            random_state=config.RANDOM_STATE,
+            stratify=y if y.value_counts().min() >= 2 else None,
+        )
+    print(f"Train: {len(X_tr)}  Test: {len(X_te)}")
     print(f"Imbalance strategy: {config.IMBALANCE_STRATEGY}")
 
     results, fitted = [], {}
@@ -84,13 +97,13 @@ def main(source: str, save_models: bool):
         y_pred = pipe.predict(X_te)
 
         row = evaluation.evaluate_model(y_te, y_pred, name)
-        row.update(evaluation.cross_validate(pipe, X, y))
+        row.update(evaluation.cross_validate(pipe, X, y, groups=groups))
         results.append(row)
         fitted[name] = pipe
 
         evaluation.print_report(y_te, y_pred, f"Typing / {name}")
         path = evaluation.save_confusion_matrix(
-            y_te, y_pred, f"typing_{name}"
+            y_te, y_pred, f"typing_{name}", out_dir=out_dir
         )
         print(f"saved: {path}")
 
@@ -98,8 +111,8 @@ def main(source: str, save_models: bool):
     print("\n================ TYPING PIPELINE RESULTS ================")
     print(table.to_string(index=False))
 
-    out = config.OUTPUT_DIR / "results_typing.csv"
-    config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = out_dir / "results_typing.csv"
+    out_dir.mkdir(parents=True, exist_ok=True)
     table.to_csv(out, index=False)
     print(f"\nsaved: {out}")
 
@@ -109,13 +122,13 @@ def main(source: str, save_models: bool):
     if imp is not None:
         print("\nTop typing features (Random Forest importance):")
         print(imp.to_string(index=False))
-        imp.to_csv(config.OUTPUT_DIR / "feature_importance_typing.csv",
+        imp.to_csv(out_dir / "feature_importance_typing.csv",
                    index=False)
 
     if save_models:
         for name, pipe in fitted.items():
-            joblib.dump(pipe, config.OUTPUT_DIR / f"model_typing_{name}.joblib")
-        print(f"\nmodels saved to {config.OUTPUT_DIR}")
+            joblib.dump(pipe, out_dir / f"model_typing_{name}.joblib")
+        print(f"\nmodels saved to {out_dir}")
 
 
 if __name__ == "__main__":

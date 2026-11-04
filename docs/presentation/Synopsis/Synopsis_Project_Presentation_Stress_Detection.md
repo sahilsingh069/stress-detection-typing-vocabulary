@@ -1,6 +1,6 @@
 ## Slide 1
 
-MINOR PROJECT
+MAJOR PROJECT
 
 Stress Level Detection Using
 User Typing Behavior and Text Vocabulary
