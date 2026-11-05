@@ -8,16 +8,15 @@
 */
 "use strict";
 
-importScripts("model.js", "engine.js");
+importScripts("model.js", "engine.js", "recent.js");
 
+const { WINDOW_MS, smooth, nextExpiry } = StressRecent;
 const HISTORY_DAYS = 30;                    // the dashboard can look back this far
 const HISTORY_MAX = 5000;                   // safety cap on stored estimates
-const SMOOTH_WINDOW_MS = 10 * 60 * 1000;   // estimates older than this are ignored
-const SMOOTH_COUNT = 5;                     // average of the last N bursts
 const NUDGE_STREAK = 3;                     // consecutive High bursts before a suggestion
 const NUDGE_COOLDOWN_MS = 30 * 60 * 1000;
+const REFRESH_ALARM = "refresh-level";
 
-const LEVELS = ["Low", "Medium", "High"];
 const BADGE = {
   Low: { text: "LOW", color: "#0F766E" },
   Medium: { text: "MED", color: "#B7791F" },
@@ -41,6 +40,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   await refreshBadge();
 });
 chrome.runtime.onStartup.addListener(refreshBadge);
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === REFRESH_ALARM) refreshBadge();
+});
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg && msg.type === "burst") handleBurst(msg);
@@ -59,16 +61,6 @@ function pruneHistory(history, now = Date.now()) {
   return history.filter((h) => h.t >= oldest).slice(-HISTORY_MAX);
 }
 
-function smooth(history, now = Date.now()) {
-  const recent = history.filter((h) => now - h.t <= SMOOTH_WINDOW_MS).slice(-SMOOTH_COUNT);
-  if (!recent.length) return null;
-  const probs = Object.fromEntries(LEVELS.map((l) => [
-    l, recent.reduce((s, h) => s + (h.probs[l] || 0), 0) / recent.length,
-  ]));
-  const label = LEVELS.reduce((a, b) => (probs[b] > probs[a] ? b : a));
-  return { label, probs, n: recent.length };
-}
-
 async function setBadge(text, color) {
   await chrome.action.setBadgeText({ text });
   if (color) await chrome.action.setBadgeBackgroundColor({ color });
@@ -76,6 +68,10 @@ async function setBadge(text, color) {
 
 async function refreshBadge() {
   const s = await chrome.storage.local.get(DEFAULTS);
+  // Wake again when the oldest recent estimate expires, so the badge cannot go stale.
+  const expiry = s.enabled ? nextExpiry(s.history) : null;
+  if (expiry) chrome.alarms.create(REFRESH_ALARM, { when: expiry + 1000 });
+  else chrome.alarms.clear(REFRESH_ALARM);
   if (!s.enabled) return setBadge("OFF", "#8B9AA8");
   const sm = smooth(s.history);
   if (!sm) return setBadge("", null);
@@ -118,7 +114,7 @@ async function maybeNudge(history, s) {
   if (!s.nudges) return;
   const now = Date.now();
   if (now - s.lastNudge < NUDGE_COOLDOWN_MS) return;
-  const recent = history.filter((h) => now - h.t <= SMOOTH_WINDOW_MS).slice(-NUDGE_STREAK);
+  const recent = history.filter((h) => now - h.t <= WINDOW_MS).slice(-NUDGE_STREAK);
   if (recent.length < NUDGE_STREAK || !recent.every((h) => h.label === "High")) return;
   await chrome.storage.local.set({ lastNudge: now });
   chrome.notifications.create(`nudge-${now}`, {

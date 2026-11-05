@@ -21,6 +21,7 @@ at least 15 keys), the badge on the toolbar icon updates:
 | Badge | Meaning |
 |---|---|
 | `LOW` / `MED` / `HIGH` | average of your last few typing bursts (last 10 minutes) |
+| no badge | nothing typed in the last 10 minutes |
 | `OFF` | extension switched off in the popup |
 
 Click the icon for details: the recent level with probabilities, what the
@@ -91,10 +92,11 @@ app. To change the extension's models, edit `fit_models` in the export script an
 
 | File | Role |
 |---|---|
-| `manifest.json` | Manifest V3; permissions: storage, notifications, activeTab; no host permissions |
+| `manifest.json` | Manifest V3; permissions: storage, alarms, notifications, activeTab; no host permissions |
 | `content.js` | runs in pages; captures typing bursts in text fields |
 | `background.js` | runs the engine, smooths estimates, badge, notifications |
 | `engine.js` | sentiment, features and the two models in JavaScript |
+| `recent.js` | the recent level, shared by the badge and popup; estimates expire after 10 minutes |
 | `model.js` | the trained model weights (generated) |
 | `popup.html/css/js` | the panel shown when the icon is clicked |
 | `dashboard.html/css/js`, `dashboard-data.js` | the history page: periods, summary, charts, table |

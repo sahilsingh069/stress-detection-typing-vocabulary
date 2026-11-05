@@ -2,10 +2,11 @@
   "manifest_version": 3,
   "name": "Stress Estimator (typing + vocabulary)",
   "short_name": "Stress Estimator",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Research prototype: estimates stress from how and what you type. Everything runs in your browser; nothing is sent anywhere.",
   "permissions": [
     "storage",
+    "alarms",
     "notifications",
     "activeTab"
   ],

@@ -26,10 +26,10 @@ function render(s) {
   $("pauseSite").disabled = !currentHost;
 
   const r = s.lastResult;
-  const sm = r && r.smoothed;
+  const sm = StressRecent.smooth(s.history);
   const level = $("level");
   level.className = "level" + (sm ? " " + sm.label : "");
-  level.textContent = !s.enabled ? "Off" : sm ? sm.label : "No estimate yet";
+  level.textContent = !s.enabled ? "Off" : sm ? sm.label : r ? "No recent estimate" : "No estimate yet";
   $("window").textContent = sm ? `(average of last ${sm.n})` : "";
 
   const bars = $("bars");
@@ -46,9 +46,9 @@ function render(s) {
     });
   } else if (s.enabled) {
     bars.appendChild(el("div", "muted small",
-      "Type a few sentences in any text box (at least 15 keys), then pause for 2 seconds."));
+      `${r ? "Nothing in the last 10 minutes. " : ""}Type a sentence in any text box (at least 15 keys and 3 words), then pause for 2 seconds.`));
   }
-  $("method").textContent = r
+  $("method").textContent = r && sm
     ? `${r.method}${r.validated ? "" : " · models not validated yet"}` : "";
 
   const mini = (id, part) => {
