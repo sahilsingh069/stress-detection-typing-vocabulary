@@ -1,25 +1,17 @@
 # Stress Estimator — Chrome extension
 
 Real-time stress feedback while you type anywhere in Chrome: Gmail, Google
-Docs, chat apps, forms. The extension measures your typing, sends it to the
-project's server **on your own computer**, and shows the result on the
-toolbar.
+Docs, chat apps, forms. Everything runs inside your browser. There is no server,
+and nothing you type leaves your computer.
 
-## Install (once)
+## Install
 
-1. In the project folder, train the models and start the server:
+1. In Chrome open `chrome://extensions`.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and select this `extension/` folder.
+4. Pin it: puzzle-piece icon in the toolbar → pin **Stress Estimator**.
 
-   ```bash
-   python train_demo.py
-   python app/server.py          # keep this terminal open
-   ```
-
-2. In Chrome open `chrome://extensions`.
-3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked** and select this `extension/` folder.
-5. Pin it: puzzle-piece icon in the toolbar → pin **Stress Estimator**.
-
-Works in any Chromium browser (Chrome, Edge, Brave).
+Works in any Chromium browser (Chrome, Edge, Brave). Python is not needed.
 
 ## Use
 
@@ -29,7 +21,6 @@ at least 15 keys), the badge on the toolbar icon updates:
 | Badge | Meaning |
 |---|---|
 | `LOW` / `MED` / `HIGH` | average of your last few typing bursts (last 10 minutes) |
-| `!` | server not running: start `python app/server.py` |
 | `OFF` | extension switched off in the popup |
 
 Click the icon for details: the recent level with probabilities, what the
@@ -40,6 +31,18 @@ of recent estimates, and the controls:
 - **Pause on this site**, e.g. for a banking or work site
 - **Suggest a break** — a notification when the last 3 bursts were all High
   (at most once every 30 minutes)
+
+## How far to trust it
+
+- The reading comes mostly from your words. The text model scores macro F1 0.761 on Dreaddit's
+  official test set, which is Reddit writing, so everyday typing may differ.
+- Typing on a single burst is at chance on people the model has not seen. It gets a weight of
+  0.25, shows as "Unclear" below 0.5 confidence, and an unclear burst with too few words is
+  skipped entirely.
+- The text model only knows Low and High, so a burst with enough words is never labelled Medium.
+  `MED` is therefore rare, and appears only when recent bursts were mostly typing with few words.
+
+It is for self-reflection, not diagnosis.
 
 ## See your stress over time
 
@@ -65,9 +68,8 @@ button on its card in `chrome://extensions` first.
   fields** (`<textarea>`, text/search inputs, rich-text editors).
 - Never reads password fields, email fields, credit-card or one-time-code
   fields.
-- Sends only what was typed during the burst — not the rest of the page or
-  the field — and only to `http://127.0.0.1:8765` (this computer). The server
-  analyses it in memory and keeps nothing.
+- Analyses only what was typed during the burst, in memory, inside the browser. It makes no
+  network requests and has no host permissions.
 - Stores only *estimates* (level, probabilities, site name, time) in Chrome's extension
   storage, for 30 days at most. Never the typed text. **Clear** in the popup or **Delete
   all history** on the dashboard removes them.
@@ -75,23 +77,25 @@ button on its card in `chrome://extensions` first.
 ## How it fits the project
 
 ```
-any web page ──content.js──► background.js ──POST /api/predict──► app/server.py
- (typing)      one burst      badge, history,     (same feature code and models
-                              break suggestion      as the experiments)
+any web page ──content.js──► background.js ──► engine.js + model.js
+ (typing)      one burst      badge, history,    (features and models, matching Python)
+                              break suggestion
 ```
 
-The models are whatever `train_demo.py` built: until own data is collected,
-the typing model comes from the SWELL-KW raw logs (23 people, 5-minute windows)
-and the popup says "unvalidated". After collecting data, re-run `python train_demo.py` and
-restart the server; the extension picks up the new models automatically.
+`python export_extension_model.py` writes `model.js`: the text model from Dreaddit and the typing
+model from SWELL-KW bursts. `tests/test_engine_parity.py` checks that the JavaScript gives the same
+features and probabilities as Python. Retraining with `train_demo.py` changes only the demo web
+app. To change the extension's models, edit `fit_models` in the export script and run it again.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `manifest.json` | Manifest V3; permissions: storage, notifications, activeTab; network access only to `127.0.0.1:8765` |
+| `manifest.json` | Manifest V3; permissions: storage, notifications, activeTab; no host permissions |
 | `content.js` | runs in pages; captures typing bursts in text fields |
-| `background.js` | calls the local server, smooths estimates, badge, notifications |
+| `background.js` | runs the engine, smooths estimates, badge, notifications |
+| `engine.js` | sentiment, features and the two models in JavaScript |
+| `model.js` | the trained model weights (generated) |
 | `popup.html/css/js` | the panel shown when the icon is clicked |
 | `dashboard.html/css/js`, `dashboard-data.js` | the history page: periods, summary, charts, table |
 | `icons/` | toolbar icons |

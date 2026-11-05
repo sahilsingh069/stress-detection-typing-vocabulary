@@ -136,7 +136,7 @@ const box = $("box");
 let events = [], t0 = null, lastDown = null, ikis = [], backs = 0, timer = null, busy = false, status = null;
 
 const LABELS = ["Low","Medium","High"];
-const SOURCE_NAMES = {own:"own collected data", dreaddit:"Dreaddit", swell:"SWELL-KW (23 people)", kaggle:"Kaggle (2 people)", synthetic:"synthetic"};
+const SOURCE_NAMES = {own:"own collected data", dreaddit:"Dreaddit", swell:"SWELL-KW (25 people)", kaggle:"Kaggle (2 people)", synthetic:"synthetic"};
 const FEATURE_NAMES = {
   typing_speed_cpm:"Typing speed (keys/min)", mean_flight_ms:"Mean gap between keys (ms)",
   std_flight_ms:"Gap variability (ms)", median_flight_ms:"Median gap (ms)",
@@ -159,7 +159,7 @@ box.addEventListener("keydown", e => {
   if(lastDown !== null){ const g = t - lastDown; if(g >= 0 && g < 60000) ikis.push(g); }
   lastDown = t;
   if(e.key === "Backspace" || e.key === "Delete") backs++;
-  events.push({ev:"down", key:e.key, code:e.code, t:+t.toFixed(2)});
+  events.push({ev:"down", key:e.key, code:e.code, t:+t.toFixed(2), repeat:e.repeat});
   stats(); schedule();
 });
 box.addEventListener("keyup", e => {

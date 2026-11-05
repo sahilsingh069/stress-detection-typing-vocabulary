@@ -2,15 +2,24 @@
   "manifest_version": 3,
   "name": "Stress Estimator (typing + vocabulary)",
   "short_name": "Stress Estimator",
-  "version": "1.1.0",
-  "description": "Research prototype: estimates stress from how and what you type, analysed only by a server on your own computer.",
-  "permissions": ["storage", "notifications", "activeTab"],
-  "host_permissions": ["http://127.0.0.1:8765/*", "http://localhost:8765/*"],
-  "background": { "service_worker": "background.js" },
+  "version": "2.0.0",
+  "description": "Research prototype: estimates stress from how and what you type. Everything runs in your browser; nothing is sent anywhere.",
+  "permissions": [
+    "storage",
+    "notifications",
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
       "all_frames": true,
       "match_about_blank": true,
       "match_origin_as_fallback": true,
@@ -20,7 +29,16 @@
   "action": {
     "default_title": "Stress Estimator",
     "default_popup": "popup.html",
-    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
   },
-  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

@@ -172,13 +172,21 @@ We're currently at an initial stage — focused on establishing the core idea, i
 
 The slides above describe the plan at synopsis stage. For the final review, use these points:
 
-- **Text works.** Macro F1 0.808 on Dreaddit's official split, against 0.761 for the interpretable model. The Dreaddit model also separates negative from positive emotions on EmoSurv with no retraining (AUC 0.669).
-- **Typing is weak on new people.** 0.581 against 0.500 chance on SWELL-KW. Comparing a person with themselves reached 0.776 per block, but with a corrected p of 0.06, so it is promising only.
-- **Fusion did not help.** No measurable gain on either paired dataset, SWELL-KW or EmoSurv.
+- **Text works.** Macro F1 0.814 (95% CI 0.782 to 0.845, AUC 0.900) on Dreaddit's official split, against 0.761 for the interpretable model. The Dreaddit model also separates negative from positive emotions on EmoSurv with no retraining (AUC 0.669).
+- **Typing works over a work block, not a burst.** On unseen people, per block, keystrokes reach 0.506 on three classes against 0.333 chance (corrected p = 0.02), and with mouse and app data 0.764 on neutral vs. time pressure (corrected p = 0.01). Neutral was always first, and these use the person's own typing. On a single burst, typing is at chance (0.323).
+- **Stricter testing removed a result.** Our earlier 0.776 fell to 0.625, not significant, once the choice of options was nested.
+- **Fusion did not help.** Across 12 nested comparisons, combining never measurably beat the better single stream.
+- **The extension runs in the browser.** No server, no network requests, about 1.5 ms per estimate. It reads mostly from text, because live typing carries no usable signal.
 - **Why our typing score is lower than the papers'.** The same logs give 0.816 with random folds over overlapping windows and 0.524 with whole people held out. Ours is the second kind.
 
 **Q: The papers report 83% to 95%. Why is your typing result so much lower?**
 > Mostly the split, and sometimes the sensors. One paper says itself that a student's samples can fall on both sides; another uses phone motion sensors; a third uses ECG. We measured the effect of the split on our own data. We report what happens with a person the model has never seen, because that is what a real user is.
+
+**Q: ELECTRA alone scored 0.825. Why quote 0.814?**
+> We chose the ensemble on a development set before scoring the test set. Switching after seeing the test score would be selecting on the test set, and the two do not measurably differ.
+
+**Q: Why does the extension hardly ever show Medium?**
+> Dreaddit's labels are binary, so the text model only knows Low and High, and text has most of the weight. We state that limit rather than invent a Medium score.
 
 **Q: EmoSurv is about emotion. Why use it for stress?**
 > As a second test of transfer and fusion, not as stress data. We call its labels emotions throughout. Anger vs. calm is our closest proxy, and we say it is only a proxy.

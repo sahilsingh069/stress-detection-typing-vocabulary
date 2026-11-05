@@ -1,14 +1,15 @@
 /*
   Background service worker.
 
-  Receives typing bursts from content scripts, sends them to the project's
-  local server (app/server.py, same /api/predict the demo page uses), keeps a
-  short history of ESTIMATES ONLY (never the text), shows a smoothed level on
-  the toolbar badge and, if enabled, suggests a break when stress stays high.
+  Receives typing bursts from content scripts, estimates stress here in the
+  browser (engine.js), keeps a short history of ESTIMATES ONLY (never the text),
+  shows a smoothed level on the toolbar badge and, if enabled, suggests a break
+  when stress stays high. This extension makes no network requests.
 */
 "use strict";
 
-const SERVER = "http://127.0.0.1:8765";
+importScripts("model.js", "engine.js");
+
 const HISTORY_DAYS = 30;                    // the dashboard can look back this far
 const HISTORY_MAX = 5000;                   // safety cap on stored estimates
 const SMOOTH_WINDOW_MS = 10 * 60 * 1000;   // estimates older than this are ignored
@@ -29,8 +30,6 @@ const DEFAULTS = {
   nudges: true,
   history: [],
   lastResult: null,
-  serverOk: null,
-  serverError: "",
   lastNudge: 0,
 };
 
@@ -78,7 +77,6 @@ async function setBadge(text, color) {
 async function refreshBadge() {
   const s = await chrome.storage.local.get(DEFAULTS);
   if (!s.enabled) return setBadge("OFF", "#8B9AA8");
-  if (s.serverOk === false) return setBadge("!", "#8B9AA8");
   const sm = smooth(s.history);
   if (!sm) return setBadge("", null);
   return setBadge(BADGE[sm.label].text, BADGE[sm.label].color);
@@ -88,38 +86,19 @@ async function handleBurst(msg) {
   const s = await chrome.storage.local.get(DEFAULTS);
   if (!s.enabled || s.pausedSites.includes(msg.site)) return;
 
-  let data;
-  try {
-    const r = await fetch(`${SERVER}/api/predict`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: msg.text, events: msg.events }),
-    });
-    data = await r.json();
-    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-  } catch (err) {
-    await chrome.storage.local.set({
-      serverOk: false,
-      serverError: String((err && err.message) || err),
-    });
-    return refreshBadge();
-  }
-
-  // Early fusion (one model on both inputs) when it exists, else late fusion.
-  const est = data.early || data.fused;
-  if (!est) {
-    await chrome.storage.local.set({ serverOk: true, serverError: "" });
-    return refreshBadge();
-  }
+  const data = StressEngine.predict(msg.text, msg.events);
+  const est = data.fused;
+  // Typing alone, and unsure: too weak to store, show or count towards the break nudge.
+  if (!est || (!data.text && data.typing && data.typing.unclear)) return refreshBadge();
 
   const entry = {
     t: Date.now(),
     site: msg.site,
     label: est.label,
     probs: est.probs,
-    method: data.early ? "early fusion" : (data.typing && data.text ? "late fusion" : "single modality"),
+    method: data.typing && data.text ? "late fusion" : "single modality",
     validated: !!est.validated,
-    typingModel: data.typing ? { label: data.typing.label, probs: data.typing.probs, source: data.typing.source } : null,
+    typingModel: data.typing ? { label: data.typing.label, probs: data.typing.probs, source: data.typing.source, unclear: data.typing.unclear } : null,
     textModel: data.text ? { label: data.text.label, probs: data.text.probs, source: data.text.source } : null,
     keys: msg.presses,
   };
@@ -130,8 +109,6 @@ async function handleBurst(msg) {
   await chrome.storage.local.set({
     history,
     lastResult: { ...entry, smoothed },
-    serverOk: true,
-    serverError: "",
   });
   await refreshBadge();
   await maybeNudge(history, s);

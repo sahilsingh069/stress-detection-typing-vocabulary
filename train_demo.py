@@ -6,9 +6,9 @@ Train the models served by the demo web app (app/server.py).
 
 Model sources, in order of preference:
 
-    typing  own collected sessions  ->  SWELL-KW raw logs (23 people, conditions as
+    typing  own collected sessions  ->  SWELL-KW bursts (25 people, conditions as
             labels)  ->  Kaggle keystroke windows (2 people). Only own data is
-            validated for short live input: the others use 5-minute windows.
+            validated for live input.
     text    own chat answers (when there are enough)  ->  Dreaddit
     early   own collected sessions only (needs paired data)
 
@@ -28,7 +28,7 @@ import pandas as pd
 
 import config
 from dataio import loaders, swell_raw
-from features import text_features, typing_features
+from features import burst_features, text_features, typing_features
 from modeling import classifiers
 
 warnings.filterwarnings("ignore")
@@ -65,7 +65,7 @@ def train_early(df: pd.DataFrame, typing_cols: list[str]):
     return pipe, list(ling.columns)
 
 
-def main(source: str = "auto", weight: float = 0.5) -> dict:
+def main(source: str = "auto", weight: float = 0.25) -> dict:
     out = config.DEMO_DIR
     out.mkdir(parents=True, exist_ok=True)
     meta = {"created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -86,11 +86,12 @@ def main(source: str = "auto", weight: float = 0.5) -> dict:
         model = train_typing(paired[typing_cols], paired["stress_label"])
         n = len(paired)
     elif swell_raw.ULOG_DIR.exists() and any(swell_raw.ULOG_DIR.glob("*.xml")):
-        print("No own data: typing model uses the SWELL-KW raw logs.")
-        win = swell_raw.load_paired()
+        print("No own data: typing model uses SWELL-KW bursts.")
+        import run_burst_model
+        win = run_burst_model.swell_bursts()
         tsrc, n = "swell", len(win)
-        typing_cols = [c for c in typing_cols if c in win.columns and win[c].notna().any()]
-        model = train_typing(win[typing_cols], win["stress_label"])
+        typing_cols = list(burst_features.FEATURES)
+        model = run_burst_model.model().fit(win[typing_cols], win["label"])
     else:
         print("No own data: typing model falls back to the Kaggle keystroke set.")
         win = typing_features.features_from_events(loaders.load_kaggle_keystrokes())
@@ -151,7 +152,7 @@ def main(source: str = "auto", weight: float = 0.5) -> dict:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", default="auto", choices=["auto", "synthetic"])
-    ap.add_argument("--weight", type=float, default=0.5,
+    ap.add_argument("--weight", type=float, default=0.25,
                     help="typing weight for late fusion shown in the app")
     args = ap.parse_args()
     main(args.source, args.weight)

@@ -82,19 +82,24 @@
     if (!enabled || paused || !e.isTrusted) return;
     const el = targetOf(e);
     if (!isObservable(el)) return;
+    if (e.repeat && (!burst || burst.el !== el)) return;   // a held key never starts a burst
     if (!burst || burst.el !== el) {
       flush();
       burst = { el, t0: performance.now(), events: [], chars: [], presses: 0 };
     }
     const t = performance.now() - burst.t0;
-    burst.events.push({ ev: "down", key: e.key, code: e.code, t: +t.toFixed(2) });
-    burst.presses++;
+    if (!e.repeat) {                       // a held key is one press
+      burst.events.push({ ev: "down", key: e.key, code: e.code, t: +t.toFixed(2) });
+      burst.presses++;
+    }
 
     // rebuild only what is typed now (approximate: ignores cursor moves)
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) burst.chars.push(e.key);
     else if (e.key === "Backspace") burst.chars.pop();
     else if (e.key === "Enter") burst.chars.push("\n");
 
+    // A held key must not keep the burst open: training bursts have no gap over the pause limit.
+    if (e.repeat) return;
     clearTimeout(timer);
     if (burst.presses >= MAX_PRESSES) flush();
     else timer = setTimeout(flush, PAUSE_MS);

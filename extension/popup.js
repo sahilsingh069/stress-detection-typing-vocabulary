@@ -1,6 +1,5 @@
 "use strict";
 
-const SERVER = "http://127.0.0.1:8765";
 const LEVELS = ["Low", "Medium", "High"];
 const SOURCES = { own: "your data", dreaddit: "Dreaddit", swell: "SWELL-KW, unvalidated", kaggle: "Kaggle, unvalidated", synthetic: "synthetic" };
 const $ = (id) => document.getElementById(id);
@@ -54,8 +53,9 @@ function render(s) {
 
   const mini = (id, part) => {
     const e = $(id);
-    e.className = "mini" + (part ? " " + part.label : "");
-    e.textContent = part ? part.label : "—";
+    const shown = part ? (part.unclear ? "Unclear" : part.label) : "—";
+    e.className = "mini" + (part && !part.unclear ? " " + part.label : "");
+    e.textContent = shown;
     e.title = part ? `model: ${SOURCES[part.source] || part.source}` : "needs more input";
   };
   mini("typing", r && r.typingModel);
@@ -79,24 +79,6 @@ async function load() {
   }));
 }
 
-async function checkServer() {
-  const out = $("server");
-  try {
-    const st = await (await fetch(`${SERVER}/api/status`)).json();
-    if (!st.ready) {
-      out.textContent = "server running, models missing: run train_demo.py";
-      out.className = "sub bad";
-      return;
-    }
-    const m = st.meta.models;
-    out.textContent = `connected · typing: ${SOURCES[m.typing.source] || m.typing.source}`;
-    out.className = "sub";
-  } catch (_) {
-    out.textContent = "server not running: python app/server.py";
-    out.className = "sub bad";
-  }
-}
-
 async function init() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -118,13 +100,11 @@ async function init() {
     await chrome.storage.local.set({ history: [], lastResult: null });
     chrome.runtime.sendMessage({ type: "refreshBadge" });
   });
-  $("demo").addEventListener("click", () => chrome.tabs.create({ url: SERVER }));
   $("dashboard").addEventListener("click", () =>
     chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") }));
 
   chrome.storage.onChanged.addListener((_, area) => { if (area === "local") load(); });
   await load();
-  checkServer();
 }
 
 init();

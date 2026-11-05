@@ -473,6 +473,69 @@ too few estimates carry a neutral marker, because fading would read as a lower s
 
 ---
 
+## D31. The extension runs in the browser, and typing gets little weight
+
+**Decision:** Run the models in JavaScript with no server. Train the typing model on bursts rather
+than 5-minute windows. Give typing a weight of 0.25, show it as "Unclear" below 0.5 confidence, and
+skip an unclear burst that has too few words for a text estimate.
+
+**Why:** A server blocked sharing the extension and added 22 ms per estimate, against about 1.5 ms in
+the browser. On unseen people, bursts score 0.323 on three classes (chance 0.333), so typing cannot
+carry a live reading. A parity test keeps the JavaScript and Python models identical.
+
+**Accepted cost:** The binary text model at 0.75 weight means a burst with enough words is never
+labelled Medium. We document this rather than invent a Medium score the data cannot support.
+
+---
+
+## D32. Text search chooses on a development set
+
+**Decision:** Choose models and the ensemble on 15% of the training posts, retrain with 3 seeds, score
+the test set once, and quote the chosen ensemble (0.814).
+
+**Why:** ELECTRA alone scored 0.825, but choosing it after seeing that would be selecting on the test
+set. The earlier ensemble stays better calibrated (0.027 against 0.098).
+
+**Corrections during the run:** DeBERTa's checkpoint is stored in float16 and trained into NaN, and
+BERTweet accepts only 128 tokens. Both were found and fixed before the test set was scored.
+mental-RoBERTa needs approved access and was not tested.
+
+---
+
+## D33. Nested selection replaces best-of-options for typing and fusion
+
+**Decision:** Choose options on training people only, and rerun the whole procedure in the
+permutation test. This supersedes D28's per-block figure.
+
+**Why:** Comparing the best option with shuffled best options controls for trying several, but the
+reported score still comes from the winner. Nested, 0.776 fell to 0.625 (not significant), while the
+3-class score of 0.506 and the interaction scores became significant after correction.
+
+**Disclosed:** Standardising within a person and the shared letter-pair table use unlabelled data from
+held-out people. These options were designed after earlier results on the same people had been seen.
+
+---
+
+## D34. EmoSurv gaps corrected, and the affected results rerun
+
+**Decision:** Build the clock before removing auto-repeats in `emosurv_options`, then rerun all EmoSurv
+typing and fusion tasks.
+
+**Why:** A code review found that gaps ran to the next logged row rather than the next press, in 65 of
+189 blocks. The fix moved active vs. passive from a corrected p of 0.02 to 0.08, so the earlier
+significant result is withdrawn.
+
+---
+
+## D35. Fusion permutation tests skipped
+
+**Decision:** Run the fusion search with `--perm 0`.
+
+**Why:** Decided before scoring: the tests matter only if combining beats the better single stream. No
+comparison did: every interval for the gain includes zero. The report states this and gives no p-values.
+
+---
+
 ## Rejected approaches, for the record
 
 | Approach | Why rejected |

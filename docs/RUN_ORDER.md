@@ -122,6 +122,17 @@ python run_leakage.py                 # the same data under leaky and honest spl
 python run_transformer.py --split official
 python run_transformer.py --split official --model roberta-base
 python run_text_ensemble.py
+
+# about 3 hours on an Apple GPU if the laptop stays awake; finished models are reused
+python run_text_search.py
+python run_text_search.py --report    # rewrites the report from saved predictions
+
+# hours on CPU; finished typing tasks are reused. Delete results.csv to start again
+python run_typing_search.py --perm 200
+python run_text_embed.py              # needs the text search's chosen models
+python run_fusion_search.py --perm 0  # add permutations only if combined wins
+python run_burst_model.py
+python export_extension_model.py      # rewrites extension/model.js
 ```
 
 ---
@@ -159,7 +170,7 @@ synthetic` (predictions are then meaningless, and the page says so).
 
 ## 7. Real-time feedback — the Chrome extension
 
-With the server from step 6 running:
+No server is needed:
 
 1. Chrome → `chrome://extensions` → turn on **Developer mode**.
 2. **Load unpacked** → select the project's `extension/` folder.
@@ -167,8 +178,7 @@ With the server from step 6 running:
 
 Type in any text box on any website and pause for 2 seconds: the toolbar badge
 shows LOW / MED / HIGH. Click it for details and controls. Full guide:
-`extension/README.md`. The server must stay running (`!` on the badge means it
-is not).
+`extension/README.md`.
 
 ---
 
@@ -180,7 +190,7 @@ python -c "import nltk; nltk.download('vader_lexicon')"
 python -m unittest discover -s tests
 
 python run_final.py
-python app/server.py        # + load extension/ in Chrome
+python app/server.py        # demo page; the extension needs no server
 
 # after collecting data into data/own/ (and/or adding data/swell_kw.csv):
 python run_final.py

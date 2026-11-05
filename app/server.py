@@ -29,7 +29,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import config  # noqa: E402
-from features import text_features, typing_features  # noqa: E402
+from features import burst_features, text_features, typing_features  # noqa: E402
 from modeling import fusion  # noqa: E402
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -73,7 +73,7 @@ MODELS = Models(config.DEMO_DIR)
 # --------------------------------------------------------------------------
 # feature extraction for one live input
 # --------------------------------------------------------------------------
-def typing_row(events: list[dict]) -> pd.DataFrame | None:
+def typing_row(events: list[dict], bursts: bool = False) -> pd.DataFrame | None:
     """Browser key events -> one row of typing features (None if too few keys)."""
     if not events:
         return None
@@ -91,7 +91,20 @@ def typing_row(events: list[dict]) -> pd.DataFrame | None:
     df["session_id"] = "live"
     feats = typing_features.features_per_session(
         df, session_col="session_id", min_presses=config.MIN_PRESSES_PER_SESSION)
-    return None if feats.empty else feats
+    if feats.empty:
+        return None
+    if not bursts:
+        return feats
+    # The SWELL-KW model scores the latest burst, cut and filtered as in training and the extension.
+    press = df[(df["event"] == "press") & ~df["key"].str.lower().isin(burst_features.MODIFIERS)]
+    if "repeat" in press.columns:
+        press = press[~press["repeat"].fillna(False).astype(bool)]
+    press = press.sort_values("t")
+    spans = burst_features.split_bursts(press["t"].to_numpy())
+    if not spans:
+        return None
+    last = press.iloc[spans[-1][0]:spans[-1][1]]
+    return feats.assign(**burst_features.burst_features(last["t"].to_numpy(), last["key"].str.lower().eq("backspace").to_numpy()))
 
 
 def text_row(text: str, ling_cols: list[str]) -> pd.DataFrame:
@@ -147,7 +160,7 @@ def predict():
     out: dict = {"warnings": [], "features": {}}
 
     # typing ---------------------------------------------------------------
-    trow = typing_row(events)
+    trow = typing_row(events, bursts=meta["typing"]["source"] == "swell")
     p_typ = None
     if trow is None:
         out["typing"] = None
@@ -159,8 +172,8 @@ def predict():
         note = "" if meta["typing"]["validated"] else (
             "Trained on the 2-person Kaggle set, which did not generalise across people. "
             "Collect data and re-run train_demo.py." if meta["typing"]["source"] == "kaggle"
-            else "Trained on SWELL-KW 5-minute windows from 23 people. On unseen people it is only "
-            "weakly better than chance, and short bursts may differ." if meta["typing"]["source"] == "swell"
+            else "Trained on SWELL-KW bursts from 25 people. A single burst says little: on unseen "
+            "people it is about chance." if meta["typing"]["source"] == "swell"
             else "Trained on synthetic data.")
         out["typing"] = _result(p_typ, meta["typing"]["source"], meta["typing"]["validated"], note)
         out["features"]["typing"] = {
@@ -224,5 +237,4 @@ if __name__ == "__main__":
         app.run(host="127.0.0.1", port=args.port, debug=False)
     except OSError as err:
         sys.exit(f"Could not use port {args.port} ({err}). Another program is using it; "
-                 f"try: python app/server.py --port 8766\n"
-                 "(the browser extension expects 8765, so free that port for it)")
+                 f"try: python app/server.py --port 8766")

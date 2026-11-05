@@ -32,10 +32,10 @@ and text data under relaxed and time-pressured conditions, a fusion layer
 
 On Dreaddit's official test split (715 segments) the interpretable text pipeline
 reaches 76.1% accuracy and 0.761 macro F1 against a 51.6% majority baseline. An
-ensemble declared in advance (the interpretable model, DistilBERT and RoBERTa) reaches
-81.0% and 0.808 (95% CI 0.775 to 0.838; ROC-AUC 0.898), a gain of 0.048 (95% CI 0.022
-to 0.075). The strongest linguistic predictors are negative sentiment and first-person
-pronoun rate.
+ensemble of DeBERTa and ELECTRA, chosen from five transformers on a development set,
+reaches 81.5% and 0.814 (95% CI 0.782 to 0.845; ROC-AUC 0.900), a gain of 0.054 over the
+interpretable model (95% CI 0.026 to 0.085). The strongest linguistic predictors are
+negative sentiment and first-person pronoun rate.
 On a public two-participant keystroke dataset the typing pipeline stays below
 its majority baseline, and a cross-user test (macro F1 0.401) shows the model
 learns individuals rather than stress — which motivated participant-grouped
@@ -51,9 +51,16 @@ We added EmoSurv (about 80 people, emotion rather than stress labels) as a secon
 paired dataset. The Dreaddit model, applied with no retraining, separates negative from
 positive emotions in new people's writing (ROC-AUC 0.669, 95% CI 0.545 to 0.779), so the
 text signal carries beyond Reddit. Typing on the pre-specified anger vs. calm task is
-near chance (macro F1 0.519), and fusion again gives no gain. Comparing each person with
-their own typing raises neutral vs. time pressure on SWELL-KW to macro F1 0.776 per block,
-but this is not significant once three tasks are corrected for (p = 0.06).
+near chance (macro F1 0.519), and fusion again gives no gain.
+
+A final search used nested cross-validation, so that choosing among options happened on
+training people only. Per block on SWELL-KW, keystrokes alone reach macro F1 0.506 on three
+classes (chance 0.333; corrected p = 0.02), and with mouse and application data 0.764 on
+neutral vs. time pressure (chance 0.500; corrected p = 0.01). Both standardise within the
+person, so they need that person's own unlabelled typing, and neutral was always the first
+block. An earlier 0.776 from keystrokes alone fell to 0.625 (p = 0.42) under this stricter
+test. Across 12 nested comparisons, combining typing and text never measurably beat the
+better single stream. On short bursts, as the live extension sees them, typing is at chance.
 
 Finally, we scored the same data the way much of the literature does. Random folds over
 overlapping windows lift SWELL-KW from macro F1 0.524 to 0.816 with no better model, which
@@ -118,11 +125,11 @@ rather than per-sample self-reports, and writing tasks rather than conversation.
 | Feature extraction | `features/typing_features.py`, `features/interaction_features.py`, `features/text_features.py` |
 | Preprocessing | `dataio/loaders.py`, imputation and scaling inside each model pipeline |
 | ML classification | `modeling/classifiers.py`, `modeling/fusion.py` |
-| Result display | `app/server.py` (demo web app), `extension/` (live badge in Chrome) |
+| Result display | `app/server.py` (demo web app), `extension/` (live badge in Chrome, no server) |
 
-The demo computes features with the same Python functions as the
-experiments, so the demonstrated system and the evaluated system cannot
-diverge.
+The demo computes features with the same Python functions as the experiments. The
+extension runs the same models in JavaScript, exported by `export_extension_model.py`, and a
+test checks that its features and probabilities match Python's.
 
 ## 6. Methodology
 
@@ -284,19 +291,23 @@ the training source of each model and whether it is validated, and the
 measured features. Nothing typed is stored.
 
 For feedback during normal work (synopsis Objective 4), a Chrome extension
-observes typing in text fields on any website, sends each burst of typing
-(after a 2-second pause) to the same local server, and shows a smoothed
+observes typing in text fields on any website, analyses each burst of typing
+(after a 2-second pause) inside the browser, and shows a smoothed
 LOW / MED / HIGH badge on the toolbar, with details in a popup and an
-optional break suggestion when stress stays high. Password, email, card and
-one-time-code fields are never read, analysis happens only on the user's
-computer, and only estimates — never text — are kept. A system-wide desktop
+optional break suggestion when stress stays high. It needs no server and makes no network
+requests, which an end-to-end browser test confirms. Password, email, card and
+one-time-code fields are never read, and only estimates — never text — are kept. A system-wide desktop
 logger was rejected on privacy grounds (Decision Log D20). A local dashboard shows
 the stored estimates over any period in the last 30 days: an average score, a timeline, a
 ranking of sites that filters the page, a weekday and time-of-day heatmap, and plain sentences
 about differences of at least 10 points on at least 3 estimates. Thin data is marked and never
-called out (Decision Log D22, D30). A prediction takes
-a median of 22 ms on the server (95th percentile 31 ms) for a 302-key burst, on our
-development laptop.
+called out (Decision Log D22, D30). An estimate takes about 1.5 ms in the browser for a
+300-key burst, against a median of 22 ms on the earlier server, on our development laptop.
+
+The extension uses the interpretable text model (macro F1 0.761), because the transformers are
+too large to ship in it. Its text model is binary and text has 0.75 of the weight, so with both
+signals present a burst's label is always Low or High: Medium can appear only for typing alone
+(Section 7.14).
 
 ### 7.6 Extended evaluation
 
@@ -422,7 +433,8 @@ should, though it cannot rule out a difference between the first block and later
 neutral was always first. Per-person standardisation needs a stretch of that person's own
 unlabelled typing, and a block needs a long period of typing, so it suits a daily or weekly
 dashboard rather than a live reading. On unseen people with no such history the figures remain
-those of Section 7.6.
+those of Section 7.6. Section 7.12 repeats this with the choice of option nested inside the
+evaluation, and the 0.776 does not hold.
 
 ### 7.10 Why published scores are higher than ours
 
@@ -449,11 +461,131 @@ emotion, and the score collapses when only timing remains.
 | Pavić et al. (2026), 86 students | Keystrokes, self-report | CV accuracy 83%; F1 0.65 and 0.79 | Same student may be in different folds, stated by the authors | Closest; its per-class F1s average 0.72, and its recalls imply about 74% test accuracy |
 | Darmawan et al. (2021), 46 people | Smartphone motion sensors + typing | Accuracy 94.77% | 10-fold; no person-independent split described; calm always first | No: different sensors |
 | Kene and Thakare (2021) | ECG | Accuracy 83.33% | 70/30 split | No: physiological. Sensitivity and specificity of 75% each imply 75% accuracy, not 83.33% |
-| **This project** | Keystrokes | N vs. T macro F1 0.581 (per minute), 0.776 per block with person history | Whole people held out | |
-| **This project** | Text, Dreaddit | Macro F1 0.808 | Authors' official split | |
+| **This project** | Keystrokes | N vs. T macro F1 0.581 (per minute), 0.625 per block with person history (not significant) | Whole people held out | |
+| **This project** | Text, Dreaddit | Macro F1 0.814 | Authors' official split | |
 
 We make no claim to outperform these studies, or that they are wrong; their setups differ. The
 comparison shows that a headline number cannot be read without knowing how the data was split.
+
+### 7.11 Text model search (Dreaddit, official split)
+
+`run_text_search.py` holds out 15% of the training posts as a development set (445 segments).
+Candidates ran for 3 epochs at a learning rate of 2e-5, and the best epoch was chosen on the
+development set. Models were then added greedily while an equal-weight average improved there.
+The chosen models were retrained on all training posts with 3 seeds, and the test set was scored
+once. It is not an untouched test set, because Section 7.7 had already used it.
+
+| Model | Dev macro F1 |
+|---|---|
+| **DeBERTa v3 small + ELECTRA (chosen)** | **0.818** |
+| DeBERTa v3 small | 0.809 |
+| ELECTRA | 0.809 |
+| RoBERTa | 0.804 |
+| DistilBERT | 0.802 |
+| BERTweet (reads at most 128 tokens) | 0.785 |
+| Interpretable | 0.726 |
+
+mental-RoBERTa was planned but not tested, because its download requires approved access.
+
+| On the test set | Accuracy | Macro F1 [95% CI] | ROC-AUC | Calibration error |
+|---|---|---|---|---|
+| **Ensemble chosen on dev** | **0.815** | **0.814 [0.782, 0.845]** | **0.900** | **0.098** |
+| ELECTRA alone | 0.827 | 0.825 [0.793, 0.855] | 0.900 | 0.114 |
+| DeBERTa alone | 0.804 | 0.803 [0.771, 0.832] | 0.893 | 0.107 |
+| Earlier ensemble (Section 7.7) | 0.810 | 0.808 [0.775, 0.838] | 0.898 | 0.027 |
+| Interpretable | 0.761 | 0.761 [0.727, 0.792] | 0.853 | 0.016 |
+
+The ensemble beats the interpretable model (+0.054, 95% CI 0.026 to 0.085) but not measurably
+the earlier ensemble (+0.006, 95% CI -0.012 to 0.025), and its probabilities are less well
+calibrated. ELECTRA's higher figure is not adopted, since that would pick a winner on the test
+set, and it does not measurably differ from the ensemble (+0.011, 95% CI -0.003 to 0.024). This
+is close to a ceiling for these methods on this data: five more models moved the score by less
+than its uncertainty. If probabilities matter more than labels, the earlier ensemble is the
+better choice.
+
+### 7.12 Typing search with nested selection
+
+`run_typing_search.py` offers many options: 120- or 300-second windows, five feature groups
+(including rhythm and letter-pair timing), raw or standardised within the person, Logistic
+Regression or gradient boosting. Inner folds choose an option on training people only, then the
+held-out people are scored, so trying many options cannot inflate the score. Units are a person's
+block, 10 repeats are averaged, and the permutation test (200 shuffles) reruns the whole
+procedure, so 0.005 is the lowest p it can report.
+
+| Data and task | Chance | Macro F1 [95% CI] | ROC-AUC | p | Holm p |
+|---|---|---|---|---|---|
+| **Keystrokes, 3-class** | 0.333 | **0.506 [0.375, 0.599]** | 0.685 | 0.005 | **0.020** |
+| Keystrokes, neutral vs. either stressor | 0.500 | 0.646 [0.516, 0.782] | 0.737 | 0.025 | 0.075 |
+| Keystrokes, neutral vs. time pressure | 0.500 | 0.625 [0.457, 0.775] | 0.700 | 0.209 | 0.418 |
+| Keystrokes, interruption vs. time pressure | 0.500 | 0.514 [0.351, 0.646] | 0.523 | 0.214 | 0.418 |
+| Order control: block 2 vs. 3 | 0.500 | 0.376 [0.263, 0.524] | 0.299 | 0.970 | not corrected |
+| **Mouse and apps included, neutral vs. time pressure** | 0.500 | **0.764 [0.620, 0.880]** | 0.789 | 0.005 | **0.010** |
+| **Mouse and apps included, 3-class** | 0.333 | **0.585 [0.469, 0.734]** | 0.765 | 0.005 | **0.010** |
+| EmoSurv free text, anger vs. calm | 0.500 | 0.652 [0.490, 0.766] | 0.768 | 0.070 | 0.209 |
+| EmoSurv free text, active vs. passive | 0.500 | 0.609 [0.510, 0.717] | 0.668 | 0.020 | 0.080 |
+| EmoSurv free text, negative vs. positive | 0.500 | 0.574 [0.477, 0.688] | 0.647 | 0.488 | 0.488 |
+| EmoSurv free text, four emotions | 0.250 | 0.370 [0.305, 0.496] | 0.622 | 0.129 | 0.259 |
+
+Intervals are computed on probabilities averaged over repeats, so a mean can sit near an edge.
+
+- **What held up.** Keystrokes alone separate the three conditions per block on unseen people, and
+  mouse and application data add more, almost always using the per-minute features standardised
+  within the person. No EmoSurv task survives correction.
+- **What did not hold.** The 0.776 of Section 7.9 was the best of a few options. Nested, the same
+  task gives 0.625 and is not significant.
+- **What the 3-class score means.** Interruption and time pressure cannot be told apart from
+  keystrokes (0.514), so the 3-class score mostly reflects neutral against stress. Neutral was
+  always block 1. The order control finds nothing between blocks 2 and 3, but it cannot rule out a
+  first-block effect such as warming up.
+- **Mouse and application data.** The 0.764 is not achievable from a browser extension, which sees
+  no such data, and it may partly reflect how the tasks differ rather than stress.
+- **Not a live score.** These need a person's whole block and their own unlabelled typing.
+- **Remaining optimism.** Standardising within a person uses that person's own unlabelled typing, and
+  the shared letter-pair table includes the held-out people's timing. Neither uses labels, so the
+  permutation test stays valid, but a model meeting a new person could not do this. These options
+  were also designed after the earlier results had been seen, on the same 25 people.
+
+### 7.13 Fusion search with nested selection
+
+`run_fusion_search.py` runs three competitors on the same units: typing options, text options
+(TF-IDF, sentence embeddings, pretrained emotion, sentiment and Dreaddit stress scores), and
+combined, which offers all of those plus weighted averages (typing weight 0.25, 0.5 or 0.75), so it
+can fall back to one stream. Permutation tests were skipped because they were needed only if
+combining won. Macro F1, mean of 10 repeats:
+
+| Data and task | Typing | Text | Combined | Combined minus better single [95% CI] |
+|---|---|---|---|---|
+| SWELL per block, N vs. T | 0.667 | 0.504 | 0.644 | -0.049 [-0.124, 0.000] |
+| SWELL per block, N vs. either | 0.686 | 0.482 | 0.642 | -0.035 [-0.113, 0.039] |
+| SWELL per block, I vs. T | 0.572 | 0.503 | 0.511 | +0.013 [-0.158, 0.176] |
+| SWELL per block, 3-class | 0.397 | 0.330 | 0.367 | -0.060 [-0.202, 0.063] |
+| SWELL per window, N vs. T | 0.552 | 0.472 | 0.517 | -0.034 [-0.097, 0.024] |
+| SWELL per window, N vs. either | 0.550 | 0.500 | 0.551 | +0.004 [-0.061, 0.067] |
+| SWELL per window, I vs. T | 0.540 | 0.494 | 0.506 | -0.026 [-0.108, 0.061] |
+| SWELL per window, 3-class | 0.370 | 0.330 | 0.341 | -0.031 [-0.091, 0.029] |
+| EmoSurv, anger vs. calm | 0.673 | 0.633 | 0.660 | -0.025 [-0.176, 0.125] |
+| EmoSurv, negative vs. positive | 0.562 | 0.670 | 0.663 | -0.021 [-0.096, 0.041] |
+| EmoSurv, active vs. passive | 0.620 | 0.544 | 0.611 | -0.032 [-0.096, 0.031] |
+| EmoSurv, four emotions | 0.364 | 0.420 | 0.447 | +0.026 [-0.047, 0.095] |
+
+The differences compare labels from probabilities averaged over repeats, so they need not equal the
+gap between the means. **Every interval includes zero: fusion was not shown to help**, with far
+richer text features and a free choice of weight. SWELL here has 22 or 23 English writers rather
+than 25, with fewer options, so its typing scores differ from Section 7.12.
+
+### 7.14 Live typing on short bursts
+
+The extension sees bursts of 15 to 400 keys, split at 2-second pauses, not whole blocks.
+`run_burst_model.py` trains on such bursts from SWELL-KW and tests on unseen people.
+
+| Task | Chance | Macro F1 per burst | Macro F1 per block |
+|---|---|---|---|
+| 3-class | 0.333 | 0.323 | 0.343 |
+| Neutral vs. time pressure | 0.500 | 0.509 | 0.546 |
+
+**A single burst carries no usable signal across people.** The extension therefore gives typing a
+weight of 0.25, labels a typing estimate below 0.5 confidence "Unclear", and leaves an unclear
+typing-only burst out of its history, badge and break suggestion. Text is what drives the reading.
 
 ## 8. Discussion
 
@@ -463,19 +595,24 @@ EmoSurv's free writing. On SWELL-KW, where participants wrote assigned reports, 
 significant signal. The vocabulary result therefore depends on what people choose to write
 about, which matters for a tool that reads everyday typing.
 
-**Typing carries a weak signal across new people.** On 25 people's per-minute logs,
-keyboard features beat chance macro F1 significantly, yet do not beat always guessing the
-majority class on accuracy, and neutral was always the first block, so some of the signal
-may reflect time in the session. Standardising within a person showed no gain on per-minute
-features, but on 5-minute windows averaged over a block it reached 0.776, short of significance
-after correction. The same idea did not help on EmoSurv. It is evidence of a signal, not a
-working detector.
+**Typing carries a real but limited signal, and only over long stretches.** On 25 people's
+per-minute logs, keyboard features beat chance macro F1 significantly, yet do not beat always
+guessing the majority class on accuracy. Per block with nested selection, keystrokes reach 0.506
+on three classes and interaction data reaches 0.764 on neutral vs. time pressure, both significant
+after correction. On single bursts the signal is gone. Neutral was always the first block, so some
+of it may reflect time in the session. No typing task on EmoSurv survives correction. It is evidence
+of a signal over a whole work block, not a working live detector.
+
+**Stricter testing changed a result in both directions.** Nesting raised nothing by itself: it
+removed the 0.776 we had called promising, while a broader search found a significant 3-class score.
+Fixing a gap-measurement bug also took EmoSurv active vs. passive from a corrected p of 0.02 to 0.08.
 
 **Fusion was not shown to help.** This was the project's central hypothesis. On two
 independent paired datasets, no fusion method measurably improved on the better single
-modality, and on one EmoSurv task it did harm: when one signal is much weaker, averaging
-dilutes the stronger one. The samples are small, so a modest effect remains possible, and the
-labels are weak: on SWELL-KW, rated stress did not differ significantly between conditions.
+modality, even with a free choice of models and weights, and on one EmoSurv task a fixed fusion did
+harm: when one signal is much weaker, averaging dilutes the stronger one. The samples are small, so a
+modest effect remains possible, and the labels are weak: on SWELL-KW, rated stress did not differ
+significantly between conditions.
 
 **Evaluation changed what we can claim.** Testing whole held-out people, fixed models,
 confidence intervals and corrected significance tests removed claims that a single
@@ -498,7 +635,11 @@ accuracy figure would have allowed.
   text is approximate; and most people have only one or two emotion blocks.
 - Transformer results come from one training seed, and earlier runs had already scored the
   classical model and DistilBERT on the official test set.
-- The live typing model is trained on 5-minute windows but receives short bursts.
+- The test set of Section 7.11 had been used before, and the searches of Sections 7.12 and 7.13
+  were designed after earlier results on the same people had been seen.
+- The live typing model is at chance on short bursts, and the extension's text model cannot output
+  Medium, so its three-level display is more detailed than its evidence.
+- The extension uses the interpretable text model, not the stronger transformers.
 - A small participant pool limits how far any result generalises.
 
 ## 10. Ethics and privacy
@@ -519,11 +660,11 @@ used for automated decisions about an individual.
 The project delivers a complete, reproducible system: two feature pipelines, three
 classifier families, three fusion strategies, participant-grouped evaluation, a
 paired-data collection tool, a live demonstration and real-time feedback in the browser
-with a history dashboard. Text classification works well on public data (macro F1 0.808 on
-the official Dreaddit split) and its signal carries over to new people's writing. Typing
-behaviour shows a weak signal on unseen people (0.581 vs. 0.500 chance), which comparing a
-person with themselves may strengthen over long periods, and fusion showed no measurable gain
-on two real paired datasets. We also measured how far common evaluation shortcuts inflate
+with a history dashboard that runs entirely in the browser. Text classification works well on
+public data (macro F1 0.814 on the official Dreaddit split) and its signal carries over to new
+people's writing. Typing behaviour shows a signal on unseen people over a whole work block (0.506
+vs. 0.333 chance on three classes, corrected p = 0.02) but none on a single burst, and fusion showed no
+measurable gain on two real paired datasets. We also measured how far common evaluation shortcuts inflate
 scores on this kind of data (macro F1 0.524 to 0.816 on the same logs). The system demonstrates
 the approach, but its current models are not accurate enough to rely on for an individual's
 stress, and it says so to the user.
@@ -535,7 +676,8 @@ stress, and it says so to the user.
 - Longer-term, in-the-wild collection (background logging with consent).
 - Testing per-person comparison on data with counterbalanced order, since neutral came first
   in both public datasets.
-- Transformer text features inside the fusion model, and a compact text model for the demo.
+- A compact transformer small enough to run inside the extension.
+- A text model with a real Medium class, which needs graded stress labels.
 - Physiological ground truth for a subset of sessions to validate the labels.
 
 ## References
@@ -554,3 +696,6 @@ stress, and it says so to the user.
 12. Darmawan, A. S., et al. (2021). Tree-based ensemble learning for stress detection by typing behavior on smartphones. *ICSECS-ICOCSIM 2021*. doi:10.1109/ICSECS52883.2021.00078.
 13. Kene, A., and Thakare, S. (2021). Mental stress level prediction and classification based on machine learning. *Smart Technologies, Communication and Robotics (STCR)*. doi:10.1109/STCR51658.2021.9588803.
 14. Liu, Y., et al. (2019). RoBERTa: A robustly optimized BERT pretraining approach. *arXiv:1907.11692*.
+15. Clark, K., Luong, M.-T., Le, Q. V., and Manning, C. D. (2020). ELECTRA: Pre-training text encoders as discriminators rather than generators. *ICLR*.
+16. He, P., Liu, X., Gao, J., and Chen, W. (2021). DeBERTa: Decoding-enhanced BERT with disentangled attention. *ICLR*.
+17. Nguyen, D. Q., Vu, T., and Nguyen, A. T. (2020). BERTweet: A pre-trained language model for English tweets. *EMNLP*.

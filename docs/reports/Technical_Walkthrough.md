@@ -258,15 +258,14 @@ recognise the person rather than their stress. Our Kaggle cross-user test
 (macro F1 about 0.40) shows how big that effect is.
 
 **"How does a real user get feedback? You only trained and tested."**
-Training happens once; the trained models are saved to files. The local
-server loads them and runs them on new input in a fraction of a second. The
-Chrome extension captures a burst of typing in any web text field, sends it to
-that server after a 2-second pause, and shows the result on the toolbar badge.
-The demo page does the same inside one page.
+Training happens once; the trained models are saved to files. The Chrome extension
+carries its models in JavaScript: it captures a burst of typing in any web text field,
+scores it in the browser after a 2-second pause, and shows the result on the toolbar
+badge. The demo page does the same through a local server.
 
 **"Isn't the extension a keylogger?"**
 No: it reads only text fields (never password, email, card or one-time-code
-fields), sends only to the user's own computer, can be paused per site or
+fields), sends nothing anywhere, can be paused per site or
 switched off, and stores only the estimates, never the text. A system-wide
 logger would be one; we rejected that (Decision Log D20).
 

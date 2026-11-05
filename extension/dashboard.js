@@ -357,7 +357,7 @@ function render() {
   $("empty").hidden = !!s.n;
   $("empty").textContent = activeSite
     ? `No estimates from ${activeSite} in this period.`
-    : "No estimates in this period. Type in any text box with the server running.";
+    : "No estimates in this period. Type in any text box, then pause for a moment.";
   if (!s.n) { hideTip(); return; }
 
   // overall
